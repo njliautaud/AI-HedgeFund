@@ -1,0 +1,325 @@
+# AI Hedge Fund Configuration
+# Comprehensive configuration for AI-driven hedge fund infrastructure
+
+# System Settings
+system:
+  name: "AI Hedge Fund"
+  version: "1.0.0"
+  environment: "development"  # development, staging, production
+  debug: true
+  log_level: "INFO"
+  data_refresh_interval: 300  # seconds
+  max_concurrent_requests: 10
+  cache_duration: 3600  # seconds
+  timezone: "UTC"
+
+# Logging Configuration
+logging:
+  console_output: true
+  file_output: true
+  log_directory: "logs"
+  max_file_size: "10MB"
+  backup_count: 30
+  format: "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+
+# Trading Configuration
+trading:
+  mode: "paper"  # paper, live
+  update_interval_seconds: 300  # 5 minutes
+  market_hours_only: true
+  timezone: "US/Eastern"
+  max_daily_trades: 50
+  max_sector_allocation: 0.25  # 25% per sector
+
+# Database Configuration
+database:
+  type: "sqlite"
+  path: "data/hedge_fund.db"
+  backup_interval: 86400  # daily backup
+
+# API Keys (set via environment variables)
+api_keys:
+  alpha_vantage: "${ALPHA_VANTAGE_API_KEY}"
+  fred: "${FRED_API_KEY}"
+  finnhub: "${FINNHUB_API_KEY}"
+  quandl: "${QUANDL_API_KEY}"
+
+# AI Models Configuration
+ai_models:
+  # Model training settings
+  training:
+    device: "auto"  # auto, cpu, cuda, mps
+    batch_size: 32
+    learning_rate: 0.001
+    epochs: 100
+    validation_split: 0.2
+    early_stopping_patience: 10
+    
+  # Model storage
+  model_directory: "models"
+  checkpoint_frequency: 10  # epochs
+  
+  # Ensemble settings
+  ensemble:
+    enabled: true
+    voting_method: "weighted"  # simple, weighted
+    confidence_threshold: 0.6
+
+# Investment Strategies
+investment_strategies:
+  # Legendary Investor AI Models
+  legendary_investors:
+    warren_buffett:
+      name: "Warren Buffett Value Investor"
+      description: "Long-term value investing focused on undervalued companies with strong fundamentals"
+      model_type: "transformer"
+      enabled: true
+      metrics:
+        - "pe_ratio"
+        - "price_to_book"
+        - "debt_to_equity"
+        - "roe"
+        - "revenue_growth"
+        - "free_cash_flow"
+        - "dividend_yield"
+      thresholds:
+        pe_ratio_max: 15
+        price_to_book_max: 1.5
+        debt_to_equity_max: 0.5
+        roe_min: 0.15
+        dividend_yield_min: 0.02
+      weight: 0.2
+
+    peter_lynch:
+      name: "Peter Lynch Growth Investor"
+      description: "Growth at reasonable price (GARP) strategy"
+      model_type: "lstm"
+      enabled: true
+      metrics:
+        - "peg_ratio"
+        - "earnings_growth"
+        - "revenue_growth"
+        - "market_cap"
+        - "insider_buying"
+      thresholds:
+        peg_ratio_max: 1.5
+        earnings_growth_min: 0.15
+        revenue_growth_min: 0.1
+      weight: 0.15
+
+    benjamin_graham:
+      name: "Benjamin Graham Deep Value"
+      description: "Deep value investing with margin of safety"
+      model_type: "random_forest"
+      enabled: true
+      metrics:
+        - "price_to_book"
+        - "current_ratio"
+        - "debt_to_equity"
+        - "earnings_yield"
+        - "working_capital"
+      thresholds:
+        price_to_book_max: 1.5
+        current_ratio_min: 2.0
+        debt_to_equity_max: 0.3
+        earnings_yield_min: 0.1
+      weight: 0.15
+
+    ray_dalio:
+      name: "Ray Dalio All Weather"
+      description: "Risk parity and macroeconomic trend following"
+      model_type: "lstm"
+      enabled: true
+      metrics:
+        - "correlation_matrix"
+        - "volatility"
+        - "economic_indicators"
+        - "currency_trends"
+      parameters:
+        correlation_threshold: 0.7
+        volatility_target: 0.12
+        rebalance_frequency: "monthly"
+      weight: 0.1
+      
+    george_soros:
+      name: "George Soros Reflexivity"
+      description: "Reflexivity theory and macro trends"
+      model_type: "transformer"
+      enabled: true
+      metrics:
+        - "market_sentiment"
+        - "momentum_indicators"
+        - "volatility_breakouts"
+        - "currency_flows"
+      parameters:
+        momentum_threshold: 0.05
+        volatility_breakout: 0.02
+        sentiment_weight: 0.3
+      weight: 0.1
+      
+    joel_greenblatt:
+      name: "Joel Greenblatt Magic Formula"
+      description: "Magic Formula investing strategy"
+      model_type: "gradient_boosting"
+      enabled: true
+      metrics:
+        - "earnings_yield"
+        - "return_on_invested_capital"
+        - "enterprise_value"
+        - "ebit"
+      parameters:
+        earnings_yield_min: 0.1
+        roic_min: 0.25
+        market_cap_min: 50000000  # $50M
+      weight: 0.1
+
+  # Custom Economic Strategy Bots
+  economic_strategies:
+
+    fed_policy_tracker:
+      name: "Federal Reserve Policy Tracker"
+      description: "Federal Reserve policy analysis and prediction"
+      model_type: "lstm"
+      enabled: true
+      indicators:
+        - "FEDFUNDS"
+        - "WALCL"
+        - "DGS10"
+        - "DGS2"
+        - "FOMC_minutes"
+      parameters:
+        rate_change_threshold: 0.25
+        yield_curve_inversion_signal: true
+        fed_speak_sentiment: true
+      weight: 0.15
+      
+    inflation_hedge:
+      name: "Inflation Protection Strategy"
+      description: "Inflation hedge and TIPS strategy"
+      model_type: "transformer"
+      enabled: true
+      indicators:
+        - "CPIAUCSL"
+        - "TIPS_spreads"
+        - "commodity_prices"
+        - "real_rates"
+      parameters:
+        inflation_threshold: 0.03
+        tips_allocation_max: 0.3
+      weight: 0.1
+      
+    recession_predictor:
+      name: "Recession Prediction Model"
+      description: "Economic recession prediction and defensive positioning"
+      model_type: "ensemble"
+      enabled: true
+      indicators:
+        - "UNRATE"
+        - "GDP"
+        - "yield_curve_inversion"
+        - "credit_spreads"
+        - "VIXCLS"
+      parameters:
+        recession_probability_threshold: 0.3
+        defensive_allocation: 0.4
+      weight: 0.12
+
+    momentum_strategy:
+      name: "Momentum Strategy"
+      description: "Technical momentum and trend following"
+      model_type: "cnn"
+      enabled: true
+      metrics:
+        - "rsi"
+        - "macd"
+        - "moving_averages"
+        - "volume"
+        - "price_momentum"
+      thresholds:
+        rsi_min: 30
+        rsi_max: 70
+        momentum_threshold: 0.1
+      weight: 0.08
+
+    mean_reversion:
+      name: "Mean Reversion Strategy"
+      description: "Statistical arbitrage and mean reversion"
+      model_type: "lstm"
+      enabled: true
+      metrics:
+        - "bollinger_bands"
+        - "z_score"
+        - "volatility"
+        - "correlation_breakdown"
+      parameters:
+        zscore_threshold: 2.0
+        holding_period: 30  # days
+        volatility_filter: true
+      weight: 0.05
+
+    sector_rotation:
+      name: "Sector Rotation Strategy"
+      description: "Economic cycle-based sector rotation"
+      model_type: "transformer"
+      enabled: true
+      metrics:
+        - "economic_cycle_indicators"
+        - "sector_relative_strength"
+        - "interest_rate_sensitivity"
+        - "earnings_revisions"
+      parameters:
+        rotation_threshold: 0.15
+        max_sector_weight: 0.25
+      weight: 0.1
+
+# Economic Indicators
+economic_indicators:
+  fed_data:
+    - "FEDFUNDS"  # Federal Funds Rate
+    - "UNRATE"    # Unemployment Rate
+    - "CPIAUCSL"  # Consumer Price Index
+    - "GDP"       # Gross Domestic Product
+    - "WALCL"     # Fed Balance Sheet
+    - "DGS10"     # 10-Year Treasury Rate
+    - "DGS2"      # 2-Year Treasury Rate
+    - "DEXUSEU"   # USD/EUR Exchange Rate
+    - "DCOILWTICO" # WTI Oil Price
+    - "GOLDAMGBD228NLBM" # Gold Price
+
+# Market Sentiment Sources
+sentiment_sources:
+  news_apis:
+    - "finnhub"
+    - "alpha_vantage"
+  social_media:
+    - "reddit"
+    - "twitter"
+  fear_greed_index: true
+  vix_analysis: true
+
+# Risk Management
+risk_management:
+  max_position_size: 0.05  # 5% max per position
+  max_sector_exposure: 0.25  # 25% max per sector
+  stop_loss: 0.15  # 15% stop loss
+  take_profit: 0.30  # 30% take profit
+  max_drawdown: 0.20  # 20% max portfolio drawdown
+
+# Portfolio Settings
+portfolio:
+  initial_capital: 100000
+  rebalance_frequency: "weekly"
+  min_cash_reserve: 0.05  # 5% cash reserve
+  transaction_cost: 0.001  # 0.1% transaction cost
+
+# UI Settings
+ui:
+  port: 8501
+  theme: "dark"
+  refresh_rate: 30  # seconds
+  charts:
+    - "portfolio_performance"
+    - "strategy_allocation"
+    - "risk_metrics"
+    - "economic_dashboard"
+    - "sentiment_analysis"
