@@ -10,7 +10,7 @@ The AI Hedge Fund system is built with a modular architecture that separates con
 +---------------------+    +------------------------+    +----------------------+
 |    DATA SOURCES     |    |    AGENT STRATEGIES    |    |   SYSTEM SERVICES   |
 +---------------------+    +------------------------+    +----------------------+
-| - Market Data       |    | - Warren Buffett      |    | - Dashboard (8080)  |
+| - Market Data       |    | - Warren Buffett      |    | - Dashboard (Dash) (8080)  |
 | - Economic Data     |----| - Peter Lynch         |----| - API Server (8081) |
 | - Fundamental Data  |    | - Benjamin Graham     |    | - Risk Management   |
 | - Sentiment Data    |    | - Ray Dalio           |    | - Portfolio Mgmt    |
@@ -102,15 +102,15 @@ A sleek, minimalist web-based dashboard for monitoring and controlling the syste
 - Risk metrics and alerts monitoring
 - System configuration and control
 
-The dashboard is built with Streamlit and provides an intuitive interface for users who prefer GUI over command-line interaction.
+The dashboard is built with Dash and provides an intuitive and modern interface for users.
 
 #### Launching the Dashboard
 
-There are multiple ways to launch the dashboard:
+To launch the Dash dashboard, run the following command from the project root directory:
 
-1. **Windows Users (Easiest)**: Double-click the `Launch Dashboard.bat` file
-2. **All Users**: Run `python launch_dashboard.py` from the command line
-3. **Manual Launch**: Run `streamlit run ui/dashboard.py` from the command line
+```bash
+python run_dashboard.py
+```
 
 Once launched, the dashboard will be available at http://localhost:8080 by default.
 ### API Server

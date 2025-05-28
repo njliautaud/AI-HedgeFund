@@ -34,7 +34,7 @@ from core.risk_manager import RiskManager
 from core.ai_model_manager import AIModelManager
 
 # UI imports
-from ui.dashboard import Dashboard
+from ui.dash_dashboard import DashDashboard as Dashboard
 from ui.api_server import APIServer
 
 # Utils
@@ -398,8 +398,6 @@ if __name__ == '__main__':
     # Run the application
     try:
         asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\nShutdown requested by user")
     except Exception as e:
-        print(f"Fatal error: {e}")
+        logger.critical(f"Fatal error: {e}")
         sys.exit(1)
