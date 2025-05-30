@@ -16,19 +16,162 @@ from typing import Dict, List, Optional, Union, Tuple
 from loguru import logger
 
 
-class TechnicalIndicators:
+class TechnicalAnalyzer:
     """
-    Calculates technical indicators for financial time series data.
+    Analyzes technical indicators and generates trading signals.
     
-    Provides a comprehensive set of technical analysis tools without
-    requiring external dependencies like TA-Lib.
+    Provides comprehensive technical analysis tools and scoring mechanisms
+    for trading strategies.
     """
     
     def __init__(self):
         """
-        Initialize the technical indicators calculator.
+        Initialize the technical analyzer.
         """
-        logger.info("Technical indicators module initialized")
+        logger.info("Technical analyzer initialized")
+        self.default_periods = {
+            'sma': 20,
+            'ema': 20,
+            'rsi': 14,
+            'macd': (12, 26, 9),
+            'stochastic': (14, 3, 3),
+            'bollinger': (20, 2),
+            'adx': 14
+        }
+
+    def calculate_sma(self, data: pd.Series, period: int = 20) -> pd.Series:
+        """
+        Calculate Simple Moving Average
+        
+        Args:
+            data: Input price series
+            period: Lookback period
+            
+        Returns:
+            SMA series
+        """
+        return data.rolling(window=period).mean()
+
+    def calculate_ema(self, data: pd.Series, period: int = 20) -> pd.Series:
+        """
+        Calculate Exponential Moving Average
+        
+        Args:
+            data: Input price series
+            period: Lookback period
+            
+        Returns:
+            EMA series
+        """
+        return data.ewm(span=period, adjust=False).mean()
+
+    def calculate_rsi(self, data: pd.DataFrame, period: int = 14) -> float:
+        """
+        Calculate Relative Strength Index
+        
+        Args:
+            data: Input price DataFrame
+            period: Lookback period
+            
+        Returns:
+            Latest RSI value
+        """
+        try:
+            delta = data['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            return rsi.iloc[-1]
+        except Exception as e:
+            logger.error(f"Error calculating RSI: {e}")
+            return 0.0
+
+    def calculate_macd(self, data: pd.Series, 
+                      fast_period: int = 12,
+                      slow_period: int = 26,
+                      signal_period: int = 9) -> Tuple[float, float]:
+        """
+        Calculate MACD and Signal Line
+        
+        Args:
+            data: Input price series
+            fast_period: Fast EMA period
+            slow_period: Slow EMA period
+            signal_period: Signal line period
+            
+        Returns:
+            Tuple of (MACD, Signal)
+        """
+        try:
+            fast_ema = self.calculate_ema(data, fast_period)
+            slow_ema = self.calculate_ema(data, slow_period)
+            macd = fast_ema - slow_ema
+            signal = self.calculate_ema(macd, signal_period)
+            return macd.iloc[-1], signal.iloc[-1]
+        except Exception as e:
+            logger.error(f"Error calculating MACD: {e}")
+            return 0.0, 0.0
+
+    def calculate_trend_strength(self, data: pd.DataFrame) -> float:
+        """
+        Calculate trend strength score
+        
+        Args:
+            data: Input price DataFrame
+            
+        Returns:
+            Trend strength score (0-100)
+        """
+        try:
+            # Calculate multiple moving averages
+            sma20 = self.calculate_sma(data['close'], 20)
+            sma50 = self.calculate_sma(data['close'], 50)
+            sma100 = self.calculate_sma(data['close'], 100)
+            
+            # Calculate trend direction scores
+            short_term = (data['close'].iloc[-1] > sma20.iloc[-1]) * 100
+            medium_term = (data['close'].iloc[-1] > sma50.iloc[-1]) * 100
+            long_term = (data['close'].iloc[-1] > sma100.iloc[-1]) * 100
+            
+            # Calculate momentum score
+            momentum = (data['close'].iloc[-1] - data['close'].iloc[-20]) / data['close'].iloc[-20] * 100
+            
+            # Combine scores
+            trend_score = (short_term + medium_term + long_term + momentum) / 4
+            return min(max(trend_score, 0), 100)
+        except Exception as e:
+            logger.error(f"Error calculating trend strength: {e}")
+            return 0.0
+
+    def score_company(self, data: Dict[str, List[float]]) -> float:
+        """
+        Calculate overall technical score for a company
+        
+        Args:
+            data: Dictionary containing price history
+            
+        Returns:
+            Overall technical score (0-100)
+        """
+        try:
+            df = pd.DataFrame(data)
+            
+            # Calculate indicators
+            rsi = self.calculate_rsi(df)
+            macd, signal = self.calculate_macd(df['close'])
+            trend_strength = self.calculate_trend_strength(df)
+            
+            # Calculate scores
+            rsi_score = 100 - abs(rsi - 50)  # Close to 50 is neutral
+            macd_score = 100 if macd > signal else 0  # MACD above signal is bullish
+            
+            # Combine scores
+            total_score = (rsi_score + trend_strength + macd_score) / 3
+            return min(max(total_score, 0), 100)
+        except Exception as e:
+            logger.error(f"Error scoring company: {e}")
+            return 0.0
     
     def add_all_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         """

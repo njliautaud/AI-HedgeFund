@@ -19,27 +19,15 @@ import pandas as pd
 from loguru import logger
 from dataclasses import dataclass
 
-from ..strategies.warren_buffett_ai import WarrenBuffettAI
-from ..strategies.peter_lynch_ai import PeterLynchAI
-from ..strategies.benjamin_graham_ai import BenjaminGrahamAI
-from ..strategies.ray_dalio_ai import RayDalioAI
-from ..strategies.momentum_strategy import MomentumStrategy
-from ..strategies.mean_reversion_strategy import MeanReversionStrategy
-from ..strategies.economic_macro_strategy import EconomicMacroStrategy
-from ..utils.signal_aggregator import SignalAggregator
-
-
-@dataclass
-class StrategySignal:
-    """Represents a trading signal from a strategy."""
-    strategy_name: str
-    symbol: str
-    action: str  # 'BUY', 'SELL', 'HOLD'
-    confidence: float  # 0.0 to 1.0
-    target_weight: float  # Portfolio weight recommendation
-    reasoning: str
-    timestamp: datetime
-    metadata: Dict[str, Any] = None
+from src.strategies.warren_buffett_ai import WarrenBuffettAI
+from src.strategies.peter_lynch_ai import PeterLynchAI
+from src.strategies.benjamin_graham_ai import BenjaminGrahamAI
+from src.strategies.ray_dalio_ai import RayDalioAI
+from src.strategies.momentum_strategy import MomentumStrategy
+from src.strategies.mean_reversion_strategy import MeanReversionStrategy
+from src.strategies.economic_macro_strategy import EconomicMacroStrategy
+from src.utils.signal_aggregator import SignalAggregator
+from src.core.signals import StrategySignal
 
 
 class StrategyManager:

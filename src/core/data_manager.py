@@ -26,7 +26,7 @@ from textblob import TextBlob
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from src.utils.cache_manager import CacheManager
-from ..utils.technical_indicators import TechnicalIndicators
+from src.utils.technical_indicators import TechnicalAnalyzer
 
 
 class DataManager:
@@ -45,7 +45,7 @@ class DataManager:
         self.config = config
         self.db_manager = db_manager
         self.cache_manager = CacheManager(config)
-        self.technical_indicators = TechnicalIndicators()
+        self.technical_analyzer = TechnicalAnalyzer()
         
         # Initialize API clients
         self._initialize_apis()

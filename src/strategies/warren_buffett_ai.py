@@ -18,7 +18,7 @@ from typing import Dict, List, Any, Optional
 from loguru import logger
 from dataclasses import dataclass
 
-from ..core.strategy_manager import StrategySignal
+from src.core.signals import StrategySignal
 from ..utils.valuation_models import DCFModel, GrahamNumber
 from ..utils.quality_metrics import QualityScorer
 
