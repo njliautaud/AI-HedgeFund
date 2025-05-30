@@ -25,7 +25,7 @@ from alpha_vantage.fundamentaldata import FundamentalData
 from textblob import TextBlob
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-from ..utils.cache_manager import CacheManager
+from src.utils.cache_manager import CacheManager
 from ..utils.technical_indicators import TechnicalIndicators
 
 
