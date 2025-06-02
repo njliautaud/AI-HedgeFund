@@ -98,6 +98,51 @@ class DashDashboard:
         self.running = False
         # The thread will terminate when the main process exits
     
+    def _create_main_layout(self):
+        """
+        Create the main layout of the dashboard with navigation and content area.
+        
+        Returns:
+            dash.html.Div: The main layout component
+        """
+        # Define the navigation bar
+        navbar = dbc.NavbarSimple(
+            children=[
+                dbc.NavItem(dbc.NavLink("Overview", href="/", active="exact")),
+                dbc.NavItem(dbc.NavLink("Portfolio", href="/portfolio", active="exact")),
+                dbc.NavItem(dbc.NavLink("Strategies", href="/strategies", active="exact")),
+                dbc.NavItem(dbc.NavLink("Risk", href="/risk", active="exact")),
+                dbc.NavItem(dbc.NavLink("Models", href="/models", active="exact")),
+                dbc.NavItem(dbc.NavLink("Agents", href="/agents", active="exact")),
+                dbc.NavItem(dbc.NavLink("Settings", href="/settings", active="exact")),
+            ],
+            brand="AI Hedge Fund",
+            brand_href="/",
+            color="primary",
+            dark=True,
+            className="mb-4"
+        )
+        
+        # Define the content area that will be updated based on URL
+        content = html.Div(id="page-content", className="container")
+        
+        # Combine navbar and content with URL routing
+        layout = html.Div([
+            dcc.Location(id="url"),
+            navbar,
+            content,
+            # Add hidden div for storing intermediate values
+            html.Div(id="intermediate-value", style={"display": "none"}),
+            # Add interval for auto-updating data
+            dcc.Interval(
+                id='interval-component',
+                interval=60*1000,  # in milliseconds, update every minute
+                n_intervals=0
+            )
+        ])
+        
+        return layout
+        
     def _run_dashboard(self):
         """
         Run the Dash dashboard.

@@ -38,6 +38,66 @@ class TechnicalAnalyzer:
             'bollinger': (20, 2),
             'adx': 14
         }
+    
+    def calculate_all(self, data: pd.DataFrame) -> Dict[str, Union[pd.Series, Dict[str, pd.Series]]]:
+        """
+        Calculate all available technical indicators for the given price data.
+        
+        Args:
+            data: DataFrame with 'Open', 'High', 'Low', 'Close', 'Volume' columns
+            
+        Returns:
+            Dictionary containing all calculated indicators
+        """
+        if not isinstance(data, pd.DataFrame) or not all(col in data.columns for col in ['Open', 'High', 'Low', 'Close', 'Volume']):
+            raise ValueError("Input must be a DataFrame with OHLCV columns")
+            
+        close = data['Close']
+        high = data['High']
+        low = data['Low']
+        volume = data['Volume']
+        
+        indicators = {}
+        
+        # Moving Averages
+        indicators['sma'] = self.calculate_sma(close, self.default_periods['sma'])
+        indicators['ema'] = self.calculate_ema(close, self.default_periods['ema'])
+        
+        # Oscillators
+        indicators['rsi'] = self.calculate_rsi(close, self.default_periods['rsi'])
+        
+        # MACD
+        macd_line, signal_line, macd_hist = self.calculate_macd(
+            close, 
+            *self.default_periods['macd']
+        )
+        indicators['macd'] = {
+            'macd_line': macd_line,
+            'signal_line': signal_line,
+            'histogram': macd_hist
+        }
+        
+        # Bollinger Bands
+        upper_band, middle_band, lower_band = self.calculate_bollinger_bands(
+            close,
+            *self.default_periods['bollinger']
+        )
+        indicators['bollinger'] = {
+            'upper': upper_band,
+            'middle': middle_band,
+            'lower': lower_band
+        }
+        
+        # ADX
+        indicators['adx'] = self.calculate_adx(
+            high, low, close, 
+            self.default_periods['adx']
+        )
+        
+        # Volume indicators
+        indicators['obv'] = self.calculate_obv(close, volume)
+        
+        return indicators
 
     def calculate_sma(self, data: pd.Series, period: int = 20) -> pd.Series:
         """

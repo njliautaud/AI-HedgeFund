@@ -19,6 +19,10 @@ import pandas as pd
 from loguru import logger
 from dataclasses import dataclass
 
+from src.core.signals import StrategySignal
+from src.utils.signal_aggregator import SignalAggregator
+
+# Import strategies
 from src.strategies.warren_buffett_ai import WarrenBuffettAI
 from src.strategies.peter_lynch_ai import PeterLynchAI
 from src.strategies.benjamin_graham_ai import BenjaminGrahamAI
@@ -26,8 +30,7 @@ from src.strategies.ray_dalio_ai import RayDalioAI
 from src.strategies.momentum_strategy import MomentumStrategy
 from src.strategies.mean_reversion_strategy import MeanReversionStrategy
 from src.strategies.economic_macro_strategy import EconomicMacroStrategy
-from src.utils.signal_aggregator import SignalAggregator
-from src.core.signals import StrategySignal
+from src.core.base_manager import BaseManager
 
 
 class StrategyManager:
@@ -38,9 +41,10 @@ class StrategyManager:
     aggregates their signals, and provides unified recommendations.
     """
     
-    def __init__(self, config: Dict, data_manager):
+    def __init__(self, config: Dict, data_manager, ai_model_manager):
         self.config = config
         self.data_manager = data_manager
+        self.ai_model_manager = ai_model_manager
         self.signal_aggregator = SignalAggregator(config)
         
         # Initialize all strategies
@@ -50,6 +54,24 @@ class StrategyManager:
         self.strategy_performance = {}
         
         logger.info(f"StrategyManager initialized with {len(self.strategies)} strategies")
+    
+    async def initialize(self):
+        """Initialize all strategies."""
+        logger.info("Initializing strategies...")
+        # Initialize each strategy
+        for name, strategy in self.strategies.items():
+            if hasattr(strategy, 'initialize'):
+                await strategy.initialize()
+        logger.info("All strategies initialized")
+    
+    async def load_states(self):
+        """Load saved states for all strategies."""
+        logger.info("Loading strategy states...")
+        # Load state for each strategy that supports it
+        for name, strategy in self.strategies.items():
+            if hasattr(strategy, 'load_state'):
+                await strategy.load_state()
+        logger.info("Strategy states loaded")
     
     def _initialize_strategies(self) -> Dict[str, Any]:
         """Initialize all investment strategy AI models."""

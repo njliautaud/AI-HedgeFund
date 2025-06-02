@@ -21,10 +21,10 @@ from dataclasses import dataclass, field
 from scipy.optimize import minimize
 import json
 
-from ..core.strategy_manager import StrategySignal
-from ..utils.portfolio_optimizer import PortfolioOptimizer
-from ..utils.risk_metrics import RiskCalculator
-from ..utils.transaction_costs import TransactionCostModel
+from src.core.strategy_manager import StrategySignal
+from src.utils.portfolio_optimizer import PortfolioOptimizer
+from src.utils.risk_metrics import RiskCalculator
+from src.utils.transaction_costs import TransactionCostModel
 
 
 @dataclass

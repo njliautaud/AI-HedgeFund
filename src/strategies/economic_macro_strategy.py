@@ -19,7 +19,7 @@ from loguru import logger
 from dataclasses import dataclass
 from scipy import stats
 
-from ..core.strategy_manager import StrategySignal
+from ..core.signals import StrategySignal
 from ..utils.economic_indicators import EconomicAnalyzer
 from ..utils.yield_curve import YieldCurveAnalyzer
 from ..utils.sector_rotation import SectorRotationModel

@@ -17,8 +17,8 @@ from typing import Dict, List, Any, Optional
 import numpy as np
 import pandas as pd
 from loguru import logger
-import tensorflow as tf
 import torch
+from torch import nn, optim
 from pathlib import Path
 
 class AIModelManager:
@@ -49,8 +49,8 @@ class AIModelManager:
         self.model_dir = Path(config.get('ai', {}).get('model_directory', 'models'))
         os.makedirs(self.model_dir, exist_ok=True)
         
-        # Set up frameworks based on available hardware
-        self.use_gpu = torch.cuda.is_available() or tf.config.list_physical_devices('GPU')
+        # Set up framework based on available hardware
+        self.use_gpu = torch.cuda.is_available()
         if self.use_gpu:
             logger.info("GPU detected, using GPU acceleration for models")
         else:
@@ -65,6 +65,61 @@ class AIModelManager:
         logger.info("Loading existing models...")
         await self.load_models()
         logger.info(f"Loaded {len(self.models)} models")
+    
+    async def start_inference_services(self):
+        """
+        Start all inference services for loaded models.
+        
+        This method initializes any necessary services for model inference,
+        such as starting model servers or warming up model caches.
+        """
+        logger.info("Starting inference services...")
+        
+        # Start inference services for each model
+        for model_id, model_info in self.models.items():
+            if model_info['model'] is None:
+                # Load the model if it's not already loaded
+                await self._load_model(model_id)
+            
+            # Initialize any inference-specific resources
+            # This is a placeholder - actual implementation would depend on the model framework
+            logger.debug(f"Initialized inference service for {model_id}")
+        
+        logger.info("Inference services started")
+    
+    async def stop_inference_services(self):
+        """
+        Stop all inference services and release resources.
+        """
+        logger.info("Stopping inference services...")
+        
+        # Clean up resources for each model
+        for model_id in self.models:
+            # Release any inference-specific resources
+            # This is a placeholder - actual implementation would depend on the model framework
+            logger.debug(f"Stopped inference service for {model_id}")
+        
+        logger.info("Inference services stopped")
+    
+    async def _load_model(self, model_id: str):
+        """
+        Load a specific model into memory.
+        
+        Args:
+            model_id: Identifier for the model to load
+        """
+        if model_id not in self.models:
+            logger.error(f"Model {model_id} not found")
+            return
+            
+        try:
+            # This is a placeholder - actual implementation would load the model from disk
+            # and initialize it with the appropriate framework
+            logger.debug(f"Loading model {model_id}")
+            # Example: self.models[model_id]['model'] = load_model_from_disk(model_id)
+            pass
+        except Exception as e:
+            logger.error(f"Error loading model {model_id}: {e}")
     
     async def load_models(self):
         """

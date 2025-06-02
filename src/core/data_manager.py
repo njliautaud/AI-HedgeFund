@@ -25,8 +25,10 @@ from alpha_vantage.fundamentaldata import FundamentalData
 from textblob import TextBlob
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-from src.utils.cache_manager import CacheManager
-from src.utils.technical_indicators import TechnicalAnalyzer
+from .base_manager import BaseManager
+from ..utils.cache_manager import CacheManager
+from ..utils.api_clients import APIClientFactory
+from ..utils.technical_indicators import TechnicalAnalyzer
 
 
 class DataManager:
@@ -58,6 +60,13 @@ class DataManager:
         self.economic_data = {}
         self.sentiment_data = {}
         self.fundamental_data = {}
+        self.technical_analyzer = TechnicalAnalyzer()
+        
+        # Data feed management
+        self.data_feeds = {}
+        self.running = False
+        self.loop = None
+        self.tasks = []
         
         logger.info("DataManager initialized")
     
@@ -87,6 +96,112 @@ class DataManager:
             logger.warning("Alpha Vantage API key not found")
             self.av_timeseries = None
             self.av_fundamentals = None
+    
+    async def start_data_feeds(self):
+        """Start real-time data feeds for market data and other sources."""
+        if self.running:
+            logger.warning("Data feeds already running")
+            return
+            
+        logger.info("Starting data feeds...")
+        self.running = True
+        self.loop = asyncio.get_event_loop()
+        
+        # Start market data feed
+        market_feed_task = self.loop.create_task(self._market_data_feed())
+        self.tasks.append(market_feed_task)
+        
+        # Start news feed if configured
+        if self.config.get('data_sources', {}).get('news', {}).get('enabled', False):
+            news_feed_task = self.loop.create_task(self._news_feed())
+            self.tasks.append(news_feed_task)
+            
+        logger.info("Data feeds started")
+    
+    async def stop_data_feeds(self):
+        """Stop all running data feeds."""
+        if not self.running:
+            return
+            
+        logger.info("Stopping data feeds...")
+        self.running = False
+        
+        # Cancel all running tasks
+        for task in self.tasks:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                    
+        self.tasks = []
+        logger.info("Data feeds stopped")
+    
+    async def _market_data_feed(self):
+        """Background task to fetch and process real-time market data."""
+        update_interval = self.config.get('data_sources', {}).get('market_data', {}).get('update_interval', 60)
+        
+        while self.running:
+            try:
+                # Get the list of symbols to track
+                symbols = self.watchlist
+                if not symbols:
+                    logger.warning("No symbols configured for market data feed")
+                    break
+                    
+                # Fetch real-time data for all symbols
+                for symbol in symbols:
+                    try:
+                        # This is a placeholder - implement actual real-time data fetching
+                        # based on your data provider (e.g., Alpaca, Polygon, etc.)
+                        logger.debug(f"Fetching real-time data for {symbol}")
+                        # Example: data = await self._fetch_realtime_data(symbol)
+                        # await self.process_market_data(symbol, data)
+                        pass
+                    except Exception as e:
+                        logger.error(f"Error processing market data for {symbol}: {e}")
+                
+                # Wait for the next update interval
+                await asyncio.sleep(update_interval)
+                
+            except asyncio.CancelledError:
+                logger.info("Market data feed cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in market data feed: {e}")
+                await asyncio.sleep(5)  # Wait before retrying on error
+    
+    async def _news_feed(self):
+        """Background task to fetch and process news articles."""
+        update_interval = self.config.get('data_sources', {}).get('news', {}).get('update_interval', 300)
+        
+        while self.running:
+            try:
+                # Get the list of symbols to track
+                symbols = self.watchlist
+                
+                # Fetch news for each symbol
+                for symbol in symbols:
+                    try:
+                        # This is a placeholder - implement actual news fetching
+                        # based on your news provider (e.g., NewsAPI, Finnhub, etc.)
+                        logger.debug(f"Fetching news for {symbol}")
+                        # Example: news = await self._fetch_news(symbol)
+                        # await self.process_news(symbol, news)
+                        pass
+                    except Exception as e:
+                        logger.error(f"Error processing news for {symbol}: {e}")
+                
+                # Wait for the next update interval
+                await asyncio.sleep(update_interval)
+                
+            except asyncio.CancelledError:
+                logger.info("News feed cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in news feed: {e}")
+                await asyncio.sleep(5)  # Wait before retrying on error
     
     async def initialize(self):
         """Initialize data sources and load initial data."""
@@ -169,7 +284,7 @@ class DataManager:
             info = ticker.info
             
             # Calculate technical indicators
-            technical_data = self.technical_indicators.calculate_all(hist_data)
+            technical_data = self.technical_analyzer.calculate_all(hist_data)
             
             # Combine all data
             symbol_data = {

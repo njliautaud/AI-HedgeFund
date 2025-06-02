@@ -27,11 +27,12 @@ import argparse
 sys.path.append(str(Path(__file__).parent / 'src'))
 
 # Core imports
-from core.data_manager import DataManager
-from core.strategy_manager import StrategyManager
-from core.portfolio_manager import PortfolioManager
-from core.risk_manager import RiskManager
-from core.ai_model_manager import AIModelManager
+from src.core.data_manager import DataManager
+from src.core.strategy_manager import StrategyManager
+from src.core.portfolio_manager import PortfolioManager
+from src.core.risk_manager import RiskManager, RiskParameters
+from src.core.ai_model_manager import AIModelManager
+from src.core.db_manager import DatabaseManager
 
 # UI imports
 from ui.dash_dashboard import DashDashboard as Dashboard
@@ -39,7 +40,7 @@ from ui.api_server import APIServer
 
 # Utils
 from utils.config_manager import ConfigManager
-from utils.logger_setup import setup_logging
+from src.utils.logger_setup import setup_logging
 
 
 class AIHedgeFund:
@@ -105,8 +106,11 @@ class AIHedgeFund:
         """Initialize core system components."""
         logger.info("Initializing core components...")
         
+        # Database Manager - handles data persistence
+        self.db_manager = DatabaseManager()
+        
         # Data Manager - handles all market data
-        self.data_manager = DataManager(self.config)
+        self.data_manager = DataManager(self.config, self.db_manager)
         await self.data_manager.initialize()
         
         # AI Model Manager - manages all AI models
@@ -114,7 +118,17 @@ class AIHedgeFund:
         await self.ai_model_manager.initialize()
         
         # Risk Manager - handles risk assessment and limits
-        self.risk_manager = RiskManager(self.config, self.data_manager)
+        self.risk_manager = RiskManager(
+            config=self.config,
+            data_manager=self.data_manager,
+            risk_params=RiskParameters(
+                max_position_size=0.05,
+                max_drawdown=0.20,
+                max_volatility=0.20,
+                value_at_risk=0.05,
+                correlation_threshold=0.80
+            )
+        )
         await self.risk_manager.initialize()
         
         # Portfolio Manager - handles portfolio construction and execution
@@ -207,7 +221,7 @@ class AIHedgeFund:
         await self.ai_model_manager.start_inference_services()
         
         # Start risk monitoring
-        await self.risk_manager.start_monitoring()
+        await self.risk_manager.start_monitoring(self.portfolio_manager)
         
         logger.info("Core services started")
     
