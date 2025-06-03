@@ -39,10 +39,36 @@ database:
 
 # API Keys (set via environment variables)
 api_keys:
-  alpha_vantage: "${ALPHA_VANTAGE_API_KEY}"
-  fred: "${FRED_API_KEY}"
-  finnhub: "${FINNHUB_API_KEY}"
-  quandl: "${QUANDL_API_KEY}"
+  # Using free data sources only
+  yfinance: "free"
+  # Other paid APIs are disabled
+  alpha_vantage: ""
+  finnhub: ""
+  fred: ""
+  quandl: ""
+
+# Cache configuration
+cache:
+  enabled: true
+  type: file
+  ttl: 3600  # 1 hour
+  max_size: 1000  # Maximum number of cache entries
+
+# Data sources configuration
+data_sources:
+  market_data:
+    update_interval: 300  # 5 minutes between updates
+    retry_interval: 10    # Initial retry delay in seconds
+    max_retries: 5       # Maximum number of retries
+    
+  economic_data:
+    update_interval: 3600  # 1 hour between updates
+    
+  fundamental_data:
+    update_interval: 86400  # 24 hours between updates
+    
+  sentiment_data:
+    update_interval: 900    # 15 minutes between updates
 
 # AI Models Configuration
 ai_models:
@@ -190,9 +216,12 @@ investment_strategies:
       parameters:
         rate_change_threshold: 0.25
         yield_curve_inversion_signal: true
-        fed_speak_sentiment: true
-      weight: 0.15
-      
+      cache:
+        enabled: true
+        type: file
+        ttl: 3600  # 1 hour
+        max_size: 1000  # Maximum number of cache entries
+
     inflation_hedge:
       name: "Inflation Protection Strategy"
       description: "Inflation hedge and TIPS strategy"

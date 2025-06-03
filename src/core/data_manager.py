@@ -74,26 +74,29 @@ class DataManager:
         """Initialize all API clients."""
         api_keys = self.config.get('api_keys', {})
         
-        # FRED API for economic data
+        # Use yfinance as primary data source
+        self.yfinance = yf
+        
+        # FRED API for economic data (disabled if no key)
         if api_keys.get('fred'):
             self.fred = Fred(api_key=api_keys['fred'])
         else:
-            logger.warning("FRED API key not found")
+            logger.info("Using yfinance for economic data")
             self.fred = None
         
-        # Finnhub API
+        # Finnhub API (disabled if no key)
         if api_keys.get('finnhub'):
             self.finnhub_client = finnhub.Client(api_key=api_keys['finnhub'])
         else:
-            logger.warning("Finnhub API key not found")
+            logger.info("Using yfinance for real-time data")
             self.finnhub_client = None
         
-        # Alpha Vantage API
+        # Alpha Vantage API (disabled if no key)
         if api_keys.get('alpha_vantage'):
             self.av_timeseries = TimeSeries(key=api_keys['alpha_vantage'])
             self.av_fundamentals = FundamentalData(key=api_keys['alpha_vantage'])
         else:
-            logger.warning("Alpha Vantage API key not found")
+            logger.info("Using yfinance for fundamental data")
             self.av_timeseries = None
             self.av_fundamentals = None
     
@@ -138,70 +141,118 @@ class DataManager:
         self.tasks = []
         logger.info("Data feeds stopped")
     
+    async def _load_symbol_data(self, symbol: str) -> Dict[str, Any]:
+        """Load market data for a single symbol with proper caching and rate limiting."""
+        try:
+            # Check cache first
+            cached_data = self.cache_manager.get(f"market_data:{symbol}")
+            if cached_data:
+                return cached_data
+            
+            # Rate limiting: wait before making API call
+            await asyncio.sleep(1)  # Wait 1 second between requests
+            
+            # Use yfinance as primary data source
+            ticker = yf.Ticker(symbol)
+            
+            # Get historical data
+            data = ticker.history(period='1d')
+            
+            if not data.empty:
+                # Store at least the price data
+                result = {
+                    'price_data': data
+                }
+                
+                try:
+                    # Attempt to get additional metrics
+                    # Get financial data
+                    financials = ticker.financials
+                    balance = ticker.balance_sheet
+                    cashflow = ticker.cashflow
+                    
+                    # Get key statistics
+                    stats = ticker.stats()
+                    
+                    # Add additional data to result
+                    result.update({
+                        'financials': financials,
+                        'balance_sheet': balance,
+                        'cashflow': cashflow,
+                        'stats': stats
+                    })
+                except Exception as e:
+                    logger.error(f"Error loading additional data for {symbol}: {e}")
+                
+                # Store in cache with appropriate TTL
+                cache_ttl = self.config.get('data_sources', {}).get('market_data', {}).get('ttl', 3600)
+                self.cache_manager.set(f"market_data:{symbol}", result, ttl=cache_ttl)
+                return result
+            else:
+                logger.warning(f"No data received for {symbol}")
+                return None
+            
+        except Exception as e:
+            logger.error(f"Error loading data for {symbol}: {e}")
+            return None
+
     async def _market_data_feed(self):
         """Background task to fetch and process real-time market data."""
-        update_interval = self.config.get('data_sources', {}).get('market_data', {}).get('update_interval', 60)
+        update_interval = self.config.get('data_sources', {}).get('market_data', {}).get('update_interval', 300)
+        retry_interval = self.config.get('data_sources', {}).get('market_data', {}).get('retry_interval', 10)
+        max_retries = self.config.get('data_sources', {}).get('market_data', {}).get('max_retries', 5)
+        
+        retry_count = 0
         
         while self.running:
             try:
-                # Get the list of symbols to track
                 symbols = self.watchlist
                 if not symbols:
                     logger.warning("No symbols configured for market data feed")
                     break
-                    
-                # Fetch real-time data for all symbols
+                
                 for symbol in symbols:
                     try:
-                        # This is a placeholder - implement actual real-time data fetching
-                        # based on your data provider (e.g., Alpaca, Polygon, etc.)
-                        logger.debug(f"Fetching real-time data for {symbol}")
-                        # Example: data = await self._fetch_realtime_data(symbol)
-                        # await self.process_market_data(symbol, data)
-                        pass
+                        # Add delay between requests to avoid rate limiting
+                        await asyncio.sleep(1)
+                        
+                        # Try to load data with retries
+                        data = None
+                        for attempt in range(max_retries):
+                            try:
+                                data = await self._load_symbol_data(symbol)
+                                if data is not None:
+                                    break
+                                await asyncio.sleep(retry_interval)
+                            except Exception as e:
+                                logger.error(f"Attempt {attempt + 1}/{max_retries} failed for {symbol}: {e}")
+                                if attempt < max_retries - 1:
+                                    await asyncio.sleep(retry_interval * (attempt + 1))  # Exponential backoff
+                        
+                        if data is not None:
+                            # Extract price data
+                            price_data = data['price_data']
+                            if not price_data.empty:
+                                self.market_data[symbol] = {
+                                    'price': price_data['Close'].iloc[-1],
+                                    'volume': price_data['Volume'].iloc[-1],
+                                    'high': price_data['High'].iloc[-1],
+                                    'low': price_data['Low'].iloc[-1]
+                                }
                     except Exception as e:
                         logger.error(f"Error processing market data for {symbol}: {e}")
+                        # Reset retry interval for each symbol
+                        retry_interval = 10
                 
-                # Wait for the next update interval
                 await asyncio.sleep(update_interval)
-                
             except asyncio.CancelledError:
                 logger.info("Market data feed cancelled")
                 break
             except Exception as e:
                 logger.error(f"Error in market data feed: {e}")
-                await asyncio.sleep(5)  # Wait before retrying on error
-    
-    async def _news_feed(self):
-        """Background task to fetch and process news articles."""
-        update_interval = self.config.get('data_sources', {}).get('news', {}).get('update_interval', 300)
-        
-        while self.running:
-            try:
-                # Get the list of symbols to track
-                symbols = self.watchlist
-                
-                # Fetch news for each symbol
-                for symbol in symbols:
-                    try:
-                        # This is a placeholder - implement actual news fetching
-                        # based on your news provider (e.g., NewsAPI, Finnhub, etc.)
-                        logger.debug(f"Fetching news for {symbol}")
-                        # Example: news = await self._fetch_news(symbol)
-                        # await self.process_news(symbol, news)
-                        pass
-                    except Exception as e:
-                        logger.error(f"Error processing news for {symbol}: {e}")
-                
-                # Wait for the next update interval
-                await asyncio.sleep(update_interval)
-                
-            except asyncio.CancelledError:
-                logger.info("News feed cancelled")
-                break
-            except Exception as e:
-                logger.error(f"Error in news feed: {e}")
-                await asyncio.sleep(5)  # Wait before retrying on error
+                # Exponential backoff for general errors
+                await asyncio.sleep(retry_interval)
+                retry_interval = min(retry_interval * 2, 300)  # Cap at 5 minutes
     
     async def initialize(self):
         """Initialize data sources and load initial data."""
@@ -260,60 +311,11 @@ class DataManager:
         for symbol, result in zip(symbols, results):
             if isinstance(result, Exception):
                 logger.error(f"Failed to load data for {symbol}: {result}")
-            else:
-                successful += 1
-        
-        logger.info(f"Successfully loaded data for {successful}/{len(symbols)} symbols")
-    
-    async def _load_symbol_data(self, symbol: str) -> Dict[str, Any]:
-        """Load comprehensive data for a single symbol."""
-        try:
-            # Check cache first
-            cached_data = await self.cache_manager.get(f"market_data_{symbol}")
-            if cached_data:
-                self.market_data[symbol] = cached_data
-                return cached_data
-            
-            # Load fresh data
-            ticker = yf.Ticker(symbol)
-            
-            # Get historical data
-            hist_data = ticker.history(period="2y", interval="1d")
-            
-            # Get fundamental data
-            info = ticker.info
-            
-            # Calculate technical indicators
-            technical_data = self.technical_analyzer.calculate_all(hist_data)
-            
-            # Combine all data
-            symbol_data = {
-                'symbol': symbol,
-                'price_data': hist_data,
-                'fundamentals': info,
-                'technical_indicators': technical_data,
-                'last_updated': datetime.now()
-            }
-            
-            # Store in memory and cache
-            self.market_data[symbol] = symbol_data
-            await self.cache_manager.set(f"market_data_{symbol}", symbol_data)
-            
-            return symbol_data
-            
-        except Exception as e:
-            logger.error(f"Error loading data for {symbol}: {e}")
-            raise
-    
-    async def load_economic_data(self):
-        """Load economic indicators from FRED."""
-        if not self.fred:
-            logger.warning("FRED API not available, skipping economic data")
-            return
-        
-        logger.info("Loading economic indicators...")
-        
-        indicators = self.config.get('economic_indicators', {}).get('fed_data', [])
+
+    async def load_economic_data(self, indicators: List[str] = None):
+        """Load economic indicator data."""
+        if indicators is None:
+            indicators = self.config.get('economic_indicators', {}).get('fred_data', [])
         
         for indicator in indicators:
             try:
@@ -321,27 +323,28 @@ class DataManager:
                 cached_data = await self.cache_manager.get(f"economic_{indicator}")
                 if cached_data:
                     self.economic_data[indicator] = cached_data
-                    continue
-                
+                    continue  # Continue to next indicator if we have cached data
+
                 # Load from FRED
                 data = self.fred.get_series(
-                    indicator, 
+                    indicator,
                     start=datetime.now() - timedelta(days=365*5)  # 5 years
                 )
-                
+
+                # Calculate technical indicators
+                technical_data = self.technical_analyzer.calculate_all(data)
+
                 self.economic_data[indicator] = {
                     'data': data,
+                    'technical_indicators': technical_data,
                     'last_updated': datetime.now()
                 }
-                
-                # Cache the data
-                await self.cache_manager.set(f"economic_{indicator}", self.economic_data[indicator])
-                
-                logger.debug(f"Loaded economic indicator: {indicator}")
-                
+
+                logger.info(f"Successfully loaded {indicator} data")
             except Exception as e:
-                logger.error(f"Error loading economic indicator {indicator}: {e}")
-    
+                logger.error(f"Error loading {indicator}: {e}")
+                continue  # Continue to next indicator even if one fails
+
     async def initialize_sentiment_analysis(self):
         """Initialize sentiment analysis data sources."""
         logger.info("Initializing sentiment analysis...")
@@ -351,12 +354,63 @@ class DataManager:
         
         # Load news sentiment for major symbols
         await self._load_news_sentiment()
-    
+
     async def _load_vix_data(self):
         """Load VIX (volatility index) data."""
         try:
             vix_ticker = yf.Ticker("^VIX")
             vix_data = vix_ticker.history(period="1y")
+            
+            if not vix_data.empty:
+                self.vix_data = {
+                    'data': vix_data,
+                    'last_updated': datetime.now()
+                }
+                logger.info("Successfully loaded VIX data")
+            else:
+                logger.warning("No VIX data received")
+        except Exception as e:
+            logger.error(f"Error loading VIX data: {e}")
+
+    async def _load_news_sentiment(self):
+        """Load news sentiment data for major symbols."""
+        try:
+            symbols = self.config.get('sentiment_analysis', {}).get('symbols', [])
+            if not symbols:
+                logger.warning("No symbols configured for news sentiment analysis")
+                return
+            
+            for symbol in symbols:
+                try:
+                    # Load news data using yfinance
+                    ticker = yf.Ticker(symbol)
+                    news = ticker.news
+                    
+                    if news:
+                        # Calculate sentiment scores
+                        sentiment_scores = []
+                        for article in news:
+                            try:
+                                text = article.get('title', '') + ' ' + article.get('summary', '')
+                                if text:
+                                    sentiment = self.sentiment_analyzer.analyze(text)
+                                    sentiment_scores.append(sentiment)
+                            except Exception as e:
+                                logger.error(f"Error analyzing news article: {e}")
+                        
+                        if sentiment_scores:
+                            avg_sentiment = sum(sentiment_scores) / len(sentiment_scores)
+                            self.news_sentiment[symbol] = {
+                                'sentiment': avg_sentiment,
+                                'last_updated': datetime.now()
+                            }
+                            logger.info(f"Successfully loaded news sentiment for {symbol}")
+                    else:
+                        logger.warning(f"No news found for {symbol}")
+                except Exception as e:
+                    logger.error(f"Error loading news sentiment for {symbol}: {e}")
+        except Exception as e:
+            logger.error(f"Error in news sentiment loading: {e}")
             
             self.sentiment_data['vix'] = {
                 'data': vix_data,

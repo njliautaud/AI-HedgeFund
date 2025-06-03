@@ -23,8 +23,9 @@ from loguru import logger
 from datetime import datetime
 import argparse
 
-# Add src to path for imports
-sys.path.append(str(Path(__file__).parent / 'src'))
+# Add project root to path for imports
+project_root = Path(__file__).parent
+sys.path.append(str(project_root))
 
 # Core imports
 from src.core.data_manager import DataManager
@@ -40,7 +41,8 @@ from ui.api_server import APIServer
 
 # Utils
 from utils.config_manager import ConfigManager
-from src.utils.logger_setup import setup_logging
+# Import logger setup directly from the module path
+from src.utils.logger_setup import setup_logging, get_logger
 
 
 class AIHedgeFund:
@@ -85,7 +87,12 @@ class AIHedgeFund:
             self.config = ConfigManager.load_config(self.config_path)
             
             # Setup logging
-            setup_logging(self.config.get('logging', {}))
+            logging_config = self.config.get('logging', {})
+            setup_logging(logging_config)
+            
+            # Get global logger instance
+            global logger
+            logger = get_logger()
             
             # Initialize core components
             await self._initialize_core_components()
@@ -284,12 +291,91 @@ class AIHedgeFund:
             await self.portfolio_manager.save_state()
             await self.strategy_manager.save_states()
             await self.ai_model_manager.save_models()
-            
             logger.info("System state saved")
-            
         except Exception as e:
             logger.error(f"Error saving system state: {e}")
-    
+
+    async def _start_core_services(self):
+        """Start core system services."""
+        # Start data feeds
+        await self.data_manager.start_data_feeds()
+        
+        # Start AI model inference services
+        await self.ai_model_manager.start_inference_services()
+        
+        # Start risk monitoring
+        await self.risk_manager.start_monitoring(self.portfolio_manager)
+        
+        logger.info("Core services started")
+
+    async def _start_ui_services(self):
+        """Start user interface services."""
+        # Start web dashboard
+        await self.dashboard.start()
+        
+        # Start API server
+        await self.api_server.start()
+        
+        logger.info("UI services started")
+        logger.info(f"Dashboard available at: http://localhost:{self.config.get('ui', {}).get('dashboard_port', 8080)}")
+        logger.info(f"API server available at: http://localhost:{self.config.get('ui', {}).get('api_port', 8081)}")
+
+    async def _start_trading_loop(self):
+        """Start the main trading loop."""
+        logger.info("Starting main trading loop...")
+        
+        update_interval = self.config.get('trading', {}).get('update_interval_seconds', 300)  # 5 minutes
+        
+        while self.running:
+            try:
+                loop_start = datetime.now()
+                
+                # Update market data
+                await self.data_manager.update_all_data()
+                
+                # Generate strategy signals
+                signals = await self.strategy_manager.generate_signals()
+                
+                # Update portfolio based on signals
+                if signals:
+                    await self.portfolio_manager.update_portfolio(signals)
+                
+                # Update risk metrics
+                await self.risk_manager.update_risk_metrics()
+                
+                # Save system state periodically
+                if (datetime.now() - (self.last_update or self.start_time)).seconds > 3600:  # Every hour
+                    await self._save_system_state()
+                    self.last_update = datetime.now()
+                
+                # Calculate sleep time
+                loop_duration = (datetime.now() - loop_start).total_seconds()
+                sleep_time = max(0, update_interval - loop_duration)
+                
+                if sleep_time > 0:
+                    await asyncio.sleep(sleep_time)
+                else:
+                    logger.warning(f"Trading loop took {loop_duration:.1f}s, longer than {update_interval}s interval")
+                    
+            except asyncio.CancelledError:
+                logger.info("Trading loop cancelled")
+                raise
+                
+            except Exception as e:
+                logger.error(f"Error in trading loop: {e}")
+                # Wait a bit before retrying to avoid tight error loops
+                await asyncio.sleep(60)
+                
+    async def _save_system_state(self):
+        """Save current system state."""
+        try:
+            await self.portfolio_manager.save_state()
+            await self.strategy_manager.save_states()
+            await self.ai_model_manager.save_models()
+            logger.info("System state saved")
+        except Exception as e:
+            logger.error(f"Error saving system state: {e}")
+
     async def stop(self):
         """Stop the AI Hedge Fund system."""
         logger.info("Stopping AI Hedge Fund system...")
@@ -298,26 +384,113 @@ class AIHedgeFund:
         
         try:
             # Save final state
-            await self._save_system_state()
+            try:
+                await self._save_system_state()
+            except Exception as e:
+                logger.error(f"Error saving system state: {e}")
             
             # Stop UI services
             if self.dashboard:
-                await self.dashboard.stop()
+                try:
+                    await self.dashboard.stop()
+                except Exception as e:
+                    logger.error(f"Error stopping dashboard: {e}")
             if self.api_server:
-                await self.api_server.stop()
+                try:
+                    await self.api_server.stop()
+                except Exception as e:
+                    logger.error(f"Error stopping API server: {e}")
             
             # Stop core services
             if self.risk_manager:
-                await self.risk_manager.stop_monitoring()
+                try:
+                    await self.risk_manager.stop_monitoring()
+                except Exception as e:
+                    logger.error(f"Error stopping risk manager: {e}")
             if self.ai_model_manager:
-                await self.ai_model_manager.stop_inference_services()
+                try:
+                    await self.ai_model_manager.stop_inference_services()
+                except Exception as e:
+                    logger.error(f"Error stopping AI models: {e}")
             if self.data_manager:
-                await self.data_manager.stop_data_feeds()
+                try:
+                    await self.data_manager.stop_data_feeds()
+                except Exception as e:
+                    logger.error(f"Error stopping data feeds: {e}")
             
             logger.info("AI Hedge Fund system stopped")
             
         except Exception as e:
             logger.error(f"Error stopping system: {e}")
+
+    def get_system_status(self) -> Dict:
+        """Get current system status."""
+        uptime = (datetime.now() - self.start_time).total_seconds() if self.start_time else 0
+        
+        return {
+            'running': self.running,
+            'uptime_seconds': uptime,
+            'start_time': self.start_time.isoformat() if self.start_time else None,
+            'components': {
+                'data_manager': self.data_manager is not None,
+                'strategy_manager': self.strategy_manager is not None,
+                'portfolio_manager': self.portfolio_manager is not None,
+                'risk_manager': self.risk_manager is not None,
+                'ai_model_manager': self.ai_model_manager is not None,
+                'dashboard': self.dashboard is not None,
+                'api_server': self.api_server is not None
+            },
+            'portfolio_summary': self.portfolio_manager.get_portfolio_summary() if self.portfolio_manager else {},
+            'active_strategies': self.strategy_manager.get_active_strategies() if self.strategy_manager else [],
+            'risk_metrics': self.risk_manager.get_current_metrics() if self.risk_manager else {}
+        }
+    
+async def stop(self):
+    """Stop the AI Hedge Fund system."""
+    logger.info("Stopping AI Hedge Fund system...")
+    
+    self.running = False
+    
+    try:
+        # Save final state
+        try:
+            await self._save_system_state()
+        except Exception as e:
+            logger.error(f"Error saving system state: {e}")
+        
+        # Stop UI services
+        if self.dashboard:
+            try:
+                await self.dashboard.stop()
+            except Exception as e:
+                logger.error(f"Error stopping dashboard: {e}")
+        if self.api_server:
+            try:
+                await self.api_server.stop()
+            except Exception as e:
+                logger.error(f"Error stopping API server: {e}")
+        
+        # Stop core services
+        if self.risk_manager:
+            try:
+                await self.risk_manager.stop_monitoring()
+            except Exception as e:
+                logger.error(f"Error stopping risk manager: {e}")
+        if self.ai_model_manager:
+            try:
+                await self.ai_model_manager.stop_inference_services()
+            except Exception as e:
+                logger.error(f"Error stopping AI models: {e}")
+        if self.data_manager:
+            try:
+                await self.data_manager.stop_data_feeds()
+            except Exception as e:
+                logger.error(f"Error stopping data feeds: {e}")
+        
+        logger.info("AI Hedge Fund system stopped")
+        
+    except Exception as e:
+        logger.error(f"Error stopping system: {e}")
     
     def get_system_status(self) -> Dict:
         """Get current system status."""
@@ -391,27 +564,39 @@ async def main():
         elif args.mode == 'train':
             # Model training mode
             logger.info("Starting model training mode")
-            await hedge_fund.ai_model_manager.train_all_models()
+            from training.training_engine import TrainingEngine
             
-    except KeyboardInterrupt:
-        logger.info("Received interrupt signal")
+            training_engine = TrainingEngine(
+                hedge_fund.config,
+                hedge_fund.strategy_manager,
+                hedge_fund.data_manager
+            )
+            
+            await training_engine.train_models(
+                strategy_filter=args.strategy
+            )
+            logger.info("Model training completed")
+            
     except Exception as e:
-        logger.error(f"Application error: {e}")
+        logger.error(f"Error in main: {e}")
         raise
+    
     finally:
-        # Cleanup
-        await hedge_fund.stop()
+        if hedge_fund:
+            await hedge_fund.stop()
+            logger.info("System stopped")
 
 
 if __name__ == '__main__':
     # Ensure data directory exists
     os.makedirs('data', exist_ok=True)
-    os.makedirs('logs', exist_ok=True)
-    os.makedirs('models', exist_ok=True)
     
-    # Run the application
+    # Run the main function
     try:
         asyncio.run(main())
     except Exception as e:
         logger.critical(f"Fatal error: {e}")
         sys.exit(1)
+    else:
+        logger.info("Application shutdown complete")
+        sys.exit(0)

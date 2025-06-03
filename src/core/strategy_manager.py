@@ -72,6 +72,15 @@ class StrategyManager:
             if hasattr(strategy, 'load_state'):
                 await strategy.load_state()
         logger.info("Strategy states loaded")
+
+    async def save_states(self):
+        """Save states for all strategies."""
+        logger.info("Saving strategy states...")
+        # Save state for each strategy that supports it
+        for name, strategy in self.strategies.items():
+            if hasattr(strategy, 'save_state'):
+                await strategy.save_state()
+        logger.info("Strategy states saved")
     
     def _initialize_strategies(self) -> Dict[str, Any]:
         """Initialize all investment strategy AI models."""

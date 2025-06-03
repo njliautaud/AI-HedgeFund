@@ -1,29 +1,19 @@
 import logging
 from loguru import logger
 from pathlib import Path
-import json
+import yaml
 from datetime import datetime
-
 
 import sys
 
-def setup_logging(config_file: str = "config/logging.json"):
+def setup_logging(config: dict):
     """
     Set up logging configuration using loguru.
     
     Args:
-        config_file: Path to the logging configuration file
+        config: Dictionary containing logging configuration
     """
     try:
-        # Load logging configuration
-        config_path = Path(config_file)
-        if not config_path.exists():
-            print(f"Warning: Logging config file not found: {config_file}")
-            return
-            
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-            
         # Set up log file rotation
         log_dir = Path("logs")
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -36,8 +26,8 @@ def setup_logging(config_file: str = "config/logging.json"):
         # Add file handler with rotation
         logger.add(
             str(log_file),
-            rotation=config.get('rotation', '00:00'),
-            retention=config.get('retention', '10 days'),
+            rotation="00:00",
+            retention="10 days",
             format=config.get('format', "{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
         )
         
@@ -51,7 +41,8 @@ def setup_logging(config_file: str = "config/logging.json"):
         
     except Exception as e:
         print(f"Error setting up logging: {e}")
-        
+        raise
+    
     return logger
 
 

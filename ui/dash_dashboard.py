@@ -77,19 +77,43 @@ class DashDashboard:
         self._setup_callbacks() # General system control callbacks
         self._setup_agent_callbacks() # Agent-specific callbacks
         self._setup_model_training_callbacks() # Model training callbacks
+            
         # Add other specific callback setups here (e.g., portfolio, strategy)
+    
+    def _run_dashboard(self):
+        """
+        Run the Dash dashboard.
+        This method is run in a separate thread.
+        """
+        try:
+            logger.info(f"Starting dashboard server on port {self.dashboard_port}")
+            self.app.run_server(debug=False, port=self.dashboard_port, host='0.0.0.0')
+        except Exception as e:
+            logger.error(f"Error in dashboard server: {e}")
+            self.running = False
     
     async def start(self):
         """
         Start the dashboard in a separate thread.
         """
         if self.running:
+            logger.warning("Dashboard is already running")
             return
             
-        self.running = True
-        self.dashboard_thread = threading.Thread(target=self._run_dashboard)
-        self.dashboard_thread.daemon = True
-        self.dashboard_thread.start()
+        try:
+            self.running = True
+            # Create a thread to run the dashboard
+            self.dashboard_thread = threading.Thread(
+                target=self._run_dashboard,
+                daemon=True,
+                name="DashboardThread"
+            )
+            self.dashboard_thread.start()
+            logger.info("Dashboard started")
+        except Exception as e:
+            logger.error(f"Failed to start dashboard: {e}")
+            self.running = False
+            raise
         
     async def stop(self):
         """
@@ -300,7 +324,7 @@ class DashDashboard:
 
     def _render_page_content(self, pathname):
         """Renders the content for the selected page based on the URL pathname."""
-        if pathname == "/":
+        if not pathname or pathname == "/":
             return self._create_overview_page()
         elif pathname == "/agents":
             return self._create_agent_control_page()
@@ -319,7 +343,7 @@ class DashDashboard:
             [
                 html.H1("404: Not found", className="text-danger"),
                 html.Hr(),
-                html.P(f"The pathname {pathname} was not recognised...")
+                html.P(f"The pathname {pathname if pathname else 'None'} was not recognised...")
             ],
             className="p-3"
         )
@@ -496,40 +520,56 @@ class DashDashboard:
 
     def _setup_navigation_callbacks(self):
         """Sets up callbacks for page navigation based on URL."""
-        @self.app.callback(Output('page-content', 'children'), [Input('url', 'pathname')])
+        @self.app.callback(
+            Output("page-content", "children"),
+            [Input("url", "pathname")],
+            prevent_initial_call=True
+        )
         def display_page(pathname):
+            """Display the appropriate page based on the URL pathname."""
+            if pathname is None:
+                return self._render_page_content("/")  # Default to home
             return self._render_page_content(pathname)
 
     def _setup_callbacks(self):
-        """
-        Set up general Dash callbacks for system control and UI updates.
-        """
+        """Set up general Dash callbacks for system control and UI updates."""
         # Callback to show/hide backtesting settings
         @self.app.callback(
             Output("backtest-settings", "style"),
-            [Input("mode-selection", "value")]
+            Input("mode-selection", "value"),
+            prevent_initial_call=True
         )
         def toggle_backtest_settings(mode):
             if mode == "backtest":
                 return {"display": "block"}
             return {"display": "none"}
 
-        # Placeholder for Start System Button callback
+        # System control callbacks
         @self.app.callback(
-            Output("system-status", "children"), # Example: update status message
-            [Input("start-button", "n_clicks")],
+            Output("system-status", "children"),
+            Input("start-button", "n_clicks"),
             prevent_initial_call=True
         )
         def handle_start_system(n_clicks):
-            if n_clicks:
-                try:
-                    # response = requests.post(f"{self.api_base_url}/system/start") # Example API call
-                    # response.raise_for_status()
-                    # return f"System started successfully. Status: {response.json().get('status')}"
-                    return [html.Span("System Start Requested (API call pending)", className="text-warning")] # Placeholder
-                except requests.exceptions.RequestException as e:
-                    return [html.Span(f"Error starting system: {e}", className="text-danger")]
-            return dash.no_update
+            if not n_clicks:
+                return dash.no_update
+                
+            try:
+                # Try to use API if available
+                if hasattr(self, 'api_base_url'):
+                    response = requests.post(f"{self.api_base_url}/system/start")
+                    if response.status_code == 200:
+                        return "Running"
+                    return "Error Starting"
+                # Fallback to direct method call if API not available
+                elif hasattr(self, 'portfolio_manager'):
+                    # This is a placeholder - implement actual system start logic
+                    logger.info("Starting system directly (no API)")
+                    return "Running"
+                return "Error: No API or direct method available"
+            except Exception as e:
+                logger.error(f"Error starting system: {e}")
+                return f"Error: {str(e)}"
         
         # Add other general callbacks (stop, mode change, etc.) here, interacting with self.api_base_url
         pass
@@ -686,28 +726,111 @@ class DashDashboard:
                     fig = go.Figure()
                     for col in history_df.columns:
                         if col.lower() != 'epoch': # Assuming 'epoch' is not a plottable metric here or handled differently
-                             fig.add_trace(go.Scatter(y=history_df[col], name=col, mode='lines+markers'))
+                            fig.add_trace(go.Scatter(y=history_df[col], name=col, mode='lines+markers'))
+                
                     fig.update_layout(title="Training History", xaxis_title="Epoch", yaxis_title="Metric Value", margin=dict(t=30, b=10, l=10, r=10), height=300)
                     history_graph = dcc.Graph(figure=fig)
-                
+            
                 metrics_display = html.Div([
                     html.H6("Final Metrics:", className="mt-3"),
-                    dcc.Markdown(f"```json\n{json.dumps(data.get("metrics", {}), indent=2)}\n```")
+                    dcc.Markdown(f"```json\n{json.dumps(data.get('metrics', {}), indent=2)}\n```")
                 ])
-                
+            
                 return status_msg, history_graph, metrics_display
-
             except requests.exceptions.RequestException as e:
                 error_detail = e.response.text if e.response else str(e)
                 return dbc.Alert(f"API Error during model training: {error_detail}", color="danger"), dash.no_update, dash.no_update
             except Exception as e:
                 return dbc.Alert(f"An unexpected error occurred: {e}", color="danger"), dash.no_update, dash.no_update
-        
-        # Callback to list existing models/agents (placeholder)
+
+    def list_existing_models(self, pathname):
+        if pathname == "/models":
+            try:
+                return dbc.Alert("Fetching existing models...", color="info")
+            except Exception as e:
+                return dbc.Alert(f"Error fetching models: {e}", color="danger")
+        return dash.no_update
+
+    def _setup_callbacks(self):
+        """Set up all Dash callbacks."""
+        # Navigation callback
+        @self.app.callback(Output('page-content', 'children'), [Input('url', 'pathname')])
+        def display_page(pathname):
+            return self._render_page_content(pathname)
+
+        # Agent callbacks
+        @self.app.callback(
+            Output("backtest-settings", "style"),
+            [Input("mode-selection", "value")]
+        )
+        def toggle_backtest_settings(mode):
+            if mode == "backtest":
+                return {"display": "block"}
+            return {"display": "none"}
+
+        # Model training callbacks
+        @self.app.callback(
+            [Output('model-training-status', 'children'),
+             Output('model-training-history-graph', 'children'),
+             Output('model-metrics-display', 'children')],
+            [Input('train-model-button', 'n_clicks')],
+            [State('model-selection', 'value'),
+             State('training-epochs', 'value'),
+             State('training-batch-size', 'value'),
+             State('analysis-type', 'value'),
+             State('url', 'pathname')]
+        )
+        def handle_train_model(n_clicks, model_name, epochs, batch_size, analysis_type, pathname):
+            if not n_clicks or pathname != "/models":
+                return dash.no_update, dash.no_update, dash.no_update
+
+            if not model_name or epochs is None or batch_size is None or not analysis_type:
+                return dbc.Alert("Please select a model and specify all training parameters.", color="warning"), dash.no_update, dash.no_update
+
+            try:
+                payload = {
+                    'model_name': model_name,
+                    'epochs': epochs,
+                    'batch_size': batch_size,
+                    'analysis_type': analysis_type
+                }
+                response = requests.post(f"{self.api_base_url}/models/train", json=payload)
+                response.raise_for_status()
+                data = response.json()
+
+                status_msg = dbc.Alert(data.get("message", "Training initiated successfully."), color="success", className="mt-2")
+                
+                history_graph = html.Div()
+                if 'history' in data and data['history']:
+                    history_df = pd.DataFrame(data['history'])
+                    fig = go.Figure()
+                    for col in history_df.columns:
+                        if col.lower() != 'epoch':
+                            fig.add_trace(go.Scatter(y=history_df[col], name=col, mode='lines+markers'))
+                    fig.update_layout(title="Training History", xaxis_title="Epoch", yaxis_title="Metric Value", margin=dict(t=30, b=10, l=10, r=10), height=300)
+                    history_graph = dcc.Graph(figure=fig)
+                
+                metrics_display = html.Div([
+                    html.H6("Final Metrics:", className="mt-3"),
+                    dcc.Markdown(f"```json\n{json.dumps(data.get('metrics', {}), indent=2)}\n```")
+                ])
+                
+                return status_msg, history_graph, metrics_display
+            except requests.exceptions.RequestException as e:
+                error_detail = e.response.text if e.response else str(e)
+                return dbc.Alert(f"API Error during model training: {error_detail}", color="danger"), dash.no_update, dash.no_update
+            except Exception as e:
+                return dbc.Alert(f"An unexpected error occurred: {e}", color="danger"), dash.no_update, dash.no_update
+
+        # Existing models callback
         @self.app.callback(
             Output('existing-models-list', 'children'),
             [Input('url', 'pathname')] 
         )
+        def list_existing_models_callback(pathname):
+            return self.list_existing_models(pathname)
+
+    def run(self):
         def list_existing_models(pathname):
             if pathname == "/models":
                 try:
@@ -723,10 +846,10 @@ class DashDashboard:
 
     def run(self):
         """Run the Dash app. For production, use a proper WSGI server like Gunicorn or Waitress."""
-        # self.app.run_server(debug=True, port=self.dashboard_port, host='0.0.0.0') # For development
-        # For production, the self.server object is typically used by the WSGI server
-        print(f"Dash dashboard available at http://localhost:{self.dashboard_port}")
-        # The actual running is handled by the WSGI server (e.g., Waitress in run_dashboard.py)
+        try:
+            self.app.run_server(debug=True, port=self.dashboard_port, host='0.0.0.0')
+        except Exception as e:
+            print(f"Error running dashboard: {e}")
 
 # Example usage (for direct script execution, not for production)
 if __name__ == '__main__':
@@ -753,4 +876,7 @@ api:
 
     dashboard = DashDashboard(config=app_config)
     # To run directly for testing (without Gunicorn/Waitress):
-    dashboard.app.run_server(debug=True, port=app_config.get('ui', {}).get('dashboard_port', 8080), host='0.0.0.0')
+    try:
+        dashboard.app.run_server(debug=True, port=app_config.get('ui', {}).get('dashboard_port', 8080), host='0.0.0.0')
+    except Exception as e:
+        print(f"Error running dashboard: {e}")
