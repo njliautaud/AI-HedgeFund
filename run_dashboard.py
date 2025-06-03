@@ -23,8 +23,8 @@ from src.core.portfolio_manager import PortfolioManager
 from src.core.strategy_manager import StrategyManager
 from src.core.ai_model_manager import AIModelManager
 from src.agents.agent_manager import AgentManager
-# Assuming a RiskManager might exist or be part of another manager for now
-# from src.core.risk_manager import RiskManager # Placeholder if you have one
+from src.core.db_manager import DatabaseManager
+from src.core.risk_manager import RiskManager, RiskParameters
 
 # Import the dashboard
 from ui.dash_dashboard import DashDashboard
@@ -41,8 +41,8 @@ async def main():
         sys.exit(1)
     
     try:
-        config_manager = ConfigManager(str(config_path))
-        config = config_manager.get_config()
+        config = ConfigManager.load_config(str(config_path))
+        logger.info("Configuration loaded successfully")
     except Exception as e:
         logger.error(f"Error loading configuration: {e}")
         sys.exit(1)
@@ -50,8 +50,12 @@ async def main():
     # Initialize managers
     # These might require API keys or other configs, ensure they are in config.yaml
     try:
+        logger.info("Initializing DatabaseManager...")
+        db_manager = DatabaseManager()
+        logger.info("DatabaseManager initialized.")
+        
         logger.info("Initializing DataManager...")
-        data_manager = DataManager(config)
+        data_manager = DataManager(config, db_manager)
         await data_manager.initialize()
         logger.info("DataManager initialized.")
 
@@ -60,19 +64,39 @@ async def main():
         # await ai_model_manager.initialize() # If it has an async init
         logger.info("AIModelManager initialized.")
 
+        logger.info("Initializing RiskManager...")
+        risk_manager = RiskManager(
+            config=config,
+            data_manager=data_manager,
+            risk_params=RiskParameters(
+                max_position_size=0.05,
+                max_drawdown=0.20,
+                max_volatility=0.20,
+                value_at_risk=0.05,
+                correlation_threshold=0.80
+            )
+        )
+        logger.info("RiskManager initialized.")
+        
         logger.info("Initializing PortfolioManager...")
-        portfolio_manager = PortfolioManager(config, data_manager)
-        await portfolio_manager.initialize()
+        portfolio_manager = PortfolioManager(config, data_manager, risk_manager)
         logger.info("PortfolioManager initialized.")
 
         logger.info("Initializing AgentManager...")
         agent_manager = AgentManager(config, ai_model_manager, data_manager, portfolio_manager)
-        await agent_manager.initialize_agents()
+        # Store ai_model_manager as an attribute if not already done
+        if not hasattr(agent_manager, 'ai_model_manager'):
+            agent_manager.ai_model_manager = ai_model_manager
+        # Initialize agents if the method exists
+        if hasattr(agent_manager, 'initialize_agents'):
+            await agent_manager.initialize_agents()
         logger.info("AgentManager and agents initialized.")
 
         logger.info("Initializing StrategyManager...")
-        strategy_manager = StrategyManager(config, agent_manager, portfolio_manager, data_manager)
-        await strategy_manager.initialize_strategies()
+        strategy_manager = StrategyManager(config, data_manager, ai_model_manager)
+        # Initialize strategies if the method exists
+        if hasattr(strategy_manager, 'initialize'):
+            await strategy_manager.initialize()
         logger.info("StrategyManager and strategies initialized.")
         
         # risk_manager = RiskManager(config, data_manager, portfolio_manager) # If you have a RiskManager
@@ -83,17 +107,32 @@ async def main():
         sys.exit(1)
 
     # Create dashboard
-    # Pass None for risk_manager if not implemented yet, or adjust DashDashboard
-    dashboard = DashDashboard(config, portfolio_manager, strategy_manager, None, data_manager, agent_manager)
+    dashboard = DashDashboard(
+        config=config,
+        portfolio_manager=portfolio_manager,
+        strategy_manager=strategy_manager,
+        risk_manager=risk_manager,
+        data_manager=data_manager,
+        agent_manager=agent_manager
+    )
     
     # Start dashboard
     try:
         await dashboard.start()
-        dashboard_port = config.get('ui', {}).get('dashboard_port', 8050) # Default to 8050 if not in config
+        dashboard_port = config.get('ui', {}).get('dashboard_port', 8050)  # Default to 8050 if not in config
         logger.info(f"Dashboard started at http://localhost:{dashboard_port}")
+        
+        # Keep the application running
+        while True:
+            await asyncio.sleep(1)
+            
     except Exception as e:
-        logger.error(f"Error starting dashboard: {e}", exc_info=True)
-        await dashboard.stop() # Attempt to clean up
+        print(f"Error starting dashboard: {e}")
+        import traceback
+        traceback.print_exc()
+        if 'dashboard' in locals():
+            if hasattr(dashboard, 'stop') and callable(dashboard.stop):
+                await dashboard.stop()
         sys.exit(1)
     
     try:

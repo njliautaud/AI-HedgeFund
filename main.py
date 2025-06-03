@@ -544,7 +544,7 @@ async def main():
         elif args.mode == 'backtest':
             # Backtesting mode
             logger.info("Starting backtesting mode")
-            from backtesting.backtest_engine import BacktestEngine
+            from backtest.backtest_engine import BacktestEngine
             
             backtest_engine = BacktestEngine(
                 hedge_fund.config,

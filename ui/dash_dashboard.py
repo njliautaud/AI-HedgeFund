@@ -16,6 +16,16 @@ from pathlib import Path
 import json
 import asyncio
 import requests # Added for API calls
+from loguru import logger
+
+# Configure logger
+logger.add(
+    "logs/dashboard.log",
+    rotation="10 MB",
+    retention="30 days",
+    level="INFO",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} - {message}"
+)
 
 # Dash imports
 import dash
@@ -77,6 +87,7 @@ class DashDashboard:
         self._setup_callbacks() # General system control callbacks
         self._setup_agent_callbacks() # Agent-specific callbacks
         self._setup_model_training_callbacks() # Model training callbacks
+        self._setup_emerging_markets_callbacks() # Emerging markets callbacks
             
         # Add other specific callback setups here (e.g., portfolio, strategy)
     
@@ -135,6 +146,7 @@ class DashDashboard:
                 dbc.NavItem(dbc.NavLink("Overview", href="/", active="exact")),
                 dbc.NavItem(dbc.NavLink("Portfolio", href="/portfolio", active="exact")),
                 dbc.NavItem(dbc.NavLink("Strategies", href="/strategies", active="exact")),
+                dbc.NavItem(dbc.NavLink("Emerging Markets", href="/emerging-markets", active="exact")),
                 dbc.NavItem(dbc.NavLink("Risk", href="/risk", active="exact")),
                 dbc.NavItem(dbc.NavLink("Models", href="/models", active="exact")),
                 dbc.NavItem(dbc.NavLink("Agents", href="/agents", active="exact")),
@@ -280,6 +292,7 @@ class DashDashboard:
                                         dbc.NavLink([html.I(className="fas fa-lightbulb me-2"), "Strategies"], href="/strategies", active="exact"),
                                         dbc.NavLink([html.I(className="fas fa-database me-2"), "Market Data"], href="/market-data", active="exact"),
                                         dbc.NavLink([html.I(className="fas fa-shield-alt me-2"), "Risk Metrics"], href="/risk", active="exact"),
+                                        dbc.NavLink([html.I(className="fas fa-globe me-2"), "Emerging Markets"], href="/emerging-markets", active="exact"),
                                     ],
                                     vertical=True,
                                     pills=True,
@@ -338,6 +351,8 @@ class DashDashboard:
             return self._create_market_data_page() # Placeholder
         elif pathname == "/risk":
             return self._create_risk_metrics_page() # Placeholder
+        elif pathname == "/emerging-markets":
+            return self._create_emerging_markets_page() # New page
         # Add more pages here
         return html.Div(
             [
@@ -509,70 +524,407 @@ class DashDashboard:
             html.Hr(className="my-4"),
             html.H4("Existing Models/Agents", className="mb-3"),
             # Placeholder for a table or list of existing trained models/agents, with options to view details, deploy, or delete
-            html.Div(id="existing-models-list", children="[Agent/Model listing will appear here - API call needed]") 
+            html.Div(id="existing-models-list", children="[Agent/Model listing will appear here - API call needed]")
         ])
 
-    # Placeholder methods for other pages - to be implemented
-    def _create_portfolio_page(self): return html.Div([html.H3("Portfolio Management"), html.P("Portfolio details and charts will go here.")])
-    def _create_strategies_page(self): return html.Div([html.H3("Strategy Management"), html.P("Strategy allocation and performance will go here.")])
-    def _create_market_data_page(self): return html.Div([html.H3("Market Data"), html.P("Market indices and economic indicators will go here.")])
-    def _create_risk_metrics_page(self): return html.Div([html.H3("Risk Metrics"), html.P("Risk metrics and heatmaps will go here.")])
+    def _create_emerging_markets_page(self):
+        """Creates the layout for the Emerging Markets page."""
+        return html.Div([
+            html.H3("Emerging Markets Analysis", className="mb-4"),
+            dbc.Row([
+                dbc.Col([
+                    html.H5("Emerging Market Opportunities", className="mb-3"),
+                    html.P("High-potential emerging markets identified by our AI:"),
+                    dcc.Loading(
+                        id="loading-emerging-markets",
+                        type="circle",
+                        children=html.Div(id="emerging-markets-table")
+                    ),
+                    html.Div(id="market-details", className="mt-3")
+                ], width=12)
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    dcc.Graph(id="market-size-chart")
+                ], width=6),
+                dbc.Col([
+                    dcc.Graph(id="market-growth-chart")
+                ], width=6)
+            ])
+        ])
+
+    def _create_overview_page(self):
+        """Creates the layout for the Overview page."""
+        return html.Div([
+            html.H1("AI Hedge Fund Dashboard", className="mb-4"),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader("Portfolio Value"),
+                        dbc.CardBody([
+                            html.H2("$1,234,567.89", className="card-title"),
+                            html.P("+2.34% Today", className="text-success mb-0"),
+                            html.P("+12.45% YTD", className="text-success")
+                        ])
+                    ], className="mb-4"),
+                ], md=4),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader("Performance"),
+                        dbc.CardBody([
+                            dcc.Graph(
+                                figure={
+                                    'data': [
+                                        {'x': ['Jan', 'Feb', 'Mar', 'Apr', 'May'], 
+                                         'y': [100, 110, 105, 120, 115], 
+                                         'type': 'line', 
+                                         'name': 'Portfolio'},
+                                        {'x': ['Jan', 'Feb', 'Mar', 'Apr', 'May'], 
+                                         'y': [100, 108, 102, 115, 112], 
+                                         'type': 'line', 
+                                         'name': 'Benchmark'}
+                                    ],
+                                    'layout': {
+                                        'height': 200,
+                                        'margin': {'l': 20, 'r': 20, 't': 20, 'b': 20},
+                                        'showlegend': False
+                                    }
+                                }
+                            )
+                        ])
+                    ]),
+                ], md=8)
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader("Top Positions"),
+                        dbc.CardBody([
+                            dbc.Table([
+                                html.Thead(html.Tr([
+                                    html.Th("Symbol"),
+                                    html.Th("Shares"),
+                                    html.Th("Avg Price"),
+                                    html.Th("Market Value"),
+                                    html.Th("P&L")
+                                ])),
+                                html.Tbody([
+                                    html.Tr([
+                                        html.Td("AAPL"),
+                                        html.Td("100"),
+                                        html.Td("$150.00"),
+                                        html.Td("$15,000.00"),
+                                        html.Td("+$2,000.00", className="text-success")
+                                    ]),
+                                    html.Tr([
+                                        html.Td("MSFT"),
+                                        html.Td("50"),
+                                        html.Td("$300.00"),
+                                        html.Td("$15,000.00"),
+                                        html.Td("+$1,500.00", className="text-success")
+                                    ])
+                                ])
+                            ], bordered=True, hover=True, responsive=True, className="table-sm")
+                        ])
+                    ])
+                ], md=6),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader("Recent Trades"),
+                        dbc.CardBody([
+                            dbc.Table([
+                                html.Thead(html.Tr([
+                                    html.Th("Date"),
+                                    html.Th("Symbol"),
+                                    html.Th("Action"),
+                                    html.Th("Shares"),
+                                    html.Th("Price")
+                                ])),
+                                html.Tbody([
+                                    html.Tr([
+                                        html.Td("2023-06-01"),
+                                        html.Td("AAPL"),
+                                        html.Td("BUY", className="text-success"),
+                                        html.Td("50"),
+                                        html.Td("$170.00")
+                                    ]),
+                                    html.Tr([
+                                        html.Td("2023-05-30"),
+                                        html.Td("MSFT"),
+                                        html.Td("SELL", className="text-danger"),
+                                        html.Td("25"),
+                                        html.Td("$320.00")
+                                    ])
+                                ])
+                            ], bordered=True, hover=True, responsive=True, className="table-sm")
+                        ])
+                    ])
+                ], md=6)
+            ], className="mt-4")
+        ])
+        
+    def _create_portfolio_page(self):
+        """Creates the layout for the Portfolio page."""
+        return html.Div([
+            html.H1("Portfolio Management", className="mb-4"),
+            html.P("Portfolio details and charts will go here.")
+        ])
+        
+    def _create_strategies_page(self):
+        """Creates the layout for the Strategy Management page."""
+        return html.Div([
+            html.H1("Strategy Management", className="mb-4"),
+            html.P("Strategy allocation and performance will go here.")
+        ])
+        
+    def _create_market_data_page(self):
+        """Creates the layout for the Market Data page."""
+        return html.Div([
+            html.H1("Market Data", className="mb-4"),
+            html.P("Market indices and economic indicators will go here.")
+        ])
+        
+    def _create_risk_metrics_page(self):
+        """Creates the layout for the Risk Metrics page."""
+        return html.Div([
+            html.H1("Risk Metrics", className="mb-4"),
+            html.P("Risk metrics and heatmaps will go here.")
+        ])
+        
+    def _create_emerging_markets_page(self):
+        """Create the Emerging Markets page with market opportunities and analysis."""
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.H3("Emerging Market Opportunities"),
+                    html.P("High-potential emerging markets identified by our AI:"),
+                    dcc.Loading(
+                        id="loading-emerging-markets",
+                        type="circle",
+                        children=html.Div(id="emerging-markets-table")
+                    ),
+                    html.Div(id="market-details", className="mt-3")
+                ], width=12)
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    dcc.Graph(id="market-size-chart")
+                ], width=6),
+                dbc.Col([
+                    dcc.Graph(id="market-growth-chart")
+                ], width=6)
+            ]),
+            dcc.Interval(
+                id='emerging-markets-interval',
+                interval=15*60*1000,  # 15 minutes
+                n_intervals=0
+            )
+        ], className="p-4")
+
+    def _create_404_page(self):
+        """Creates a 404 error page with navigation options."""
+        return dbc.Container(className="py-5", children=[
+            dbc.Row(className="justify-content-center", children=[
+                dbc.Col(md=8, lg=6, children=[
+                    dbc.Card(className="border-0 shadow-sm", children=[
+                        dbc.CardBody(className="text-center p-5", children=[
+                            html.H1("404", className="display-1 text-danger mb-4"),
+                            html.H2("Page Not Found", className="mb-4"),
+                            html.P(
+                                "The page you are looking for might have been removed, "
+                                "had its name changed, or is temporarily unavailable.",
+                                className="text-muted mb-4"
+                            ),
+                            dbc.Button("Go to Homepage", href="/", color="primary", className="px-4"),
+                            html.Div(className="mt-4", children=[
+                                html.P("Or navigate to:", className="text-muted mb-2"),
+                                html.Div(className="d-flex justify-content-center gap-3", children=[
+                                    dbc.Button("Portfolio", href="/portfolio", color="outline-primary"),
+                                    dbc.Button("Strategies", href="/strategies", color="outline-primary"),
+                                    dbc.Button("Market Data", href="/market-data", color="outline-primary")
+                                ])
+                            ])
+                        ])
+                    ])
+                ])
+            ])
+        ])
 
     def _setup_navigation_callbacks(self):
-        """Sets up callbacks for page navigation based on URL."""
+        """
+        Set up callbacks for page navigation based on URL.
+        """
         @self.app.callback(
             Output("page-content", "children"),
-            [Input("url", "pathname")],
-            prevent_initial_call=True
+            [Input("url", "pathname")]
         )
         def display_page(pathname):
-            """Display the appropriate page based on the URL pathname."""
-            if pathname is None:
-                return self._render_page_content("/")  # Default to home
-            return self._render_page_content(pathname)
-
-    def _setup_callbacks(self):
-        """Set up general Dash callbacks for system control and UI updates."""
-        # Callback to show/hide backtesting settings
+            try:
+                if not pathname or pathname == "/" or pathname == "/overview":
+                    return self._create_overview_page()
+                elif pathname == "/portfolio":
+                    return self._create_portfolio_page()
+                elif pathname == "/strategies":
+                    return self._create_strategies_page()
+                elif pathname == "/risk":
+                    return self._create_risk_metrics_page()
+                elif pathname in ["/models", "/model-training"]:
+                    return self._create_model_training_page()
+                elif pathname in ["/agents", "/agent-control"]:
+                    return self._create_agent_control_page()
+                elif pathname in ["/emerging-markets", "/emerging-markets/"]:
+                    return self._create_emerging_markets_page()
+                elif pathname == "/market-data":
+                    return self._create_market_data_page()
+                else:
+                    return self._create_404_page()
+            except Exception as e:
+                logger.error(f"Error rendering page {pathname}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                return html.Div([
+                    html.H1("Error loading page", className="text-danger"),
+                    html.P(f"An error occurred while loading the page: {str(e)}"),
+                    html.P("Please check the logs for more details.")
+                ])
+                
+    def _setup_emerging_markets_callbacks(self):
+        """Set up callbacks for the Emerging Markets page."""
         @self.app.callback(
-            Output("backtest-settings", "style"),
-            Input("mode-selection", "value"),
+            [Output("emerging-markets-table", "children"),
+             Output("market-size-chart", "figure"),
+             Output("market-growth-chart", "figure")],
+            [Input("emerging-markets-interval", "n_intervals")],
             prevent_initial_call=True
         )
-        def toggle_backtest_settings(mode):
-            if mode == "backtest":
-                return {"display": "block"}
-            return {"display": "none"}
-
-        # System control callbacks
+        def update_emerging_markets(n_intervals):
+            """Update the emerging markets data and charts."""
+            try:
+                # Get emerging markets data from the strategy
+                if self.strategy_manager and hasattr(self.strategy_manager, 'strategies') and 'emerging_markets' in self.strategy_manager.strategies:
+                    em_strategy = self.strategy_manager.strategies['emerging_markets']
+                    
+                    # Update market data
+                    asyncio.run(em_strategy.update_market_data())
+                    
+                    # Get market opportunities
+                    opportunities = em_strategy.get_market_opportunities()
+                    
+                    if not opportunities:
+                        return (
+                            dbc.Alert("No emerging market opportunities found.", color="warning"),
+                            {},
+                            {}
+                        )
+                    
+                    # Create table
+                    df = pd.DataFrame(opportunities)
+                    table = dbc.Table.from_dataframe(
+                        df[['market_name', 'market_size', 'growth_rate', 'market_score']],
+                        striped=True,
+                        bordered=True,
+                        hover=True,
+                        responsive=True,
+                        className="table-sm"
+                    )
+                    
+                    # Create charts
+                    fig_size = px.bar(
+                        df,
+                        x='market_name',
+                        y='market_size',
+                        title='Market Size (Billions USD)',
+                        labels={'market_name': 'Market', 'market_size': 'Market Size (Billions USD)'}
+                    )
+                    
+                    fig_growth = px.bar(
+                        df,
+                        x='market_name',
+                        y='growth_rate',
+                        title='Annual Growth Rate (%)',
+                        labels={'market_name': 'Market', 'growth_rate': 'Growth Rate (%)'}
+                    )
+                    
+                    return table, fig_size, fig_growth
+                
+                return (
+                    dbc.Alert("Emerging markets strategy not available.", color="danger"),
+                    {},
+                    {}
+                )
+                
+            except Exception as e:
+                logger.error(f"Error updating emerging markets: {str(e)}")
+                return (
+                    dbc.Alert(f"Error loading emerging markets data: {str(e)}", color="danger"),
+                    {},
+                    {}
+                )
+                
         @self.app.callback(
-            Output("system-status", "children"),
-            Input("start-button", "n_clicks"),
+            Output("market-details", "children"),
+            [Input("emerging-markets-table", "active_cell"),
+             Input("emerging-markets-table", "data")],
             prevent_initial_call=True
         )
-        def handle_start_system(n_clicks):
-            if not n_clicks:
-                return dash.no_update
+        def display_market_details(active_cell, data):
+            """Display details for the selected market."""
+            if not active_cell or not data:
+                return dbc.Alert("Select a market to view details.", color="info")
                 
             try:
-                # Try to use API if available
-                if hasattr(self, 'api_base_url'):
-                    response = requests.post(f"{self.api_base_url}/system/start")
-                    if response.status_code == 200:
-                        return "Running"
-                    return "Error Starting"
-                # Fallback to direct method call if API not available
-                elif hasattr(self, 'portfolio_manager'):
-                    # This is a placeholder - implement actual system start logic
-                    logger.info("Starting system directly (no API)")
-                    return "Running"
-                return "Error: No API or direct method available"
+                row = active_cell["row"]
+                market = data[row]
+                
+                # Create a card with market details
+                card = dbc.Card([
+                    dbc.CardHeader([
+                        html.H4(market["market_name"], className="mb-0")
+                    ]),
+                    dbc.CardBody([
+                        html.P(market["description"], className="card-text"),
+                        html.Hr(),
+                        html.H5("Key Metrics"),
+                        dbc.Row([
+                            dbc.Col([
+                                html.Div([
+                                    html.Small("Market Size", className="text-muted"),
+                                    html.H4(f"${market['market_size']}B")
+                                ], className="mb-3")
+                            ], width=4),
+                            dbc.Col([
+                                html.Div([
+                                    html.Small("Growth Rate", className="text-muted"),
+                                    html.H4(f"{market['growth_rate']}%")
+                                ], className="mb-3")
+                            ], width=4),
+                            dbc.Col([
+                                html.Div([
+                                    html.Small("Market Score", className="text-muted"),
+                                    html.H4(f"{market['market_score']:.1f}/100")
+                                ], className="mb-3")
+                            ], width=4)
+                        ]),
+                        html.H5("Key Drivers"),
+                        html.Ul([html.Li(driver) for driver in market["key_drivers"].split(", ")]),
+                        html.H5("Risks"),
+                        html.Ul([html.Li(risk) for risk in market["risks"].split(", ")]),
+                        html.Hr(),
+                        html.Div([
+                            html.Small("Last Updated: "),
+                            html.Small(datetime.fromisoformat(market["last_updated"]).strftime("%Y-%m-%d %H:%M"))
+                        ], className="text-muted")
+                    ]),
+                    dbc.CardFooter([
+                        dbc.Button("View Research", color="primary", href=market["source_urls"][0], target="_blank")
+                    ])
+                ])
+                
+                return card
+                
             except Exception as e:
-                logger.error(f"Error starting system: {e}")
-                return f"Error: {str(e)}"
-        
-        # Add other general callbacks (stop, mode change, etc.) here, interacting with self.api_base_url
-        pass
+                logger.error(f"Error displaying market details: {str(e)}")
+                return dbc.Alert(f"Error displaying market details: {str(e)}", color="danger")
 
     def _setup_agent_callbacks(self):
         """Sets up callbacks related to agent control and ticker analysis."""
@@ -683,92 +1035,64 @@ class DashDashboard:
             except Exception as e:
                 return dbc.Alert(f"An unexpected error occurred: {e}", color="danger", className="mt-2")
 
-    def _setup_model_training_callbacks(self):
-        """Sets up callbacks for AI model training."""
-        @self.app.callback(
-            [Output('model-training-status', 'children'),
-             Output('model-training-history-graph', 'children'),
-             Output('model-metrics-display', 'children')],
-            [Input('train-model-button', 'n_clicks')],
-            [State('model-selection', 'value'),
-             State('training-epochs', 'value'),
-             State('training-batch-size', 'value'),
-             State('analysis-type', 'value'),
-             State('url', 'pathname')]
-        )
-        def handle_train_model(n_clicks, model_name, epochs, batch_size, analysis_type, pathname):
-            if not n_clicks or pathname != "/models":
-                return dash.no_update, dash.no_update, dash.no_update
-
-            if not model_name or epochs is None or batch_size is None or not analysis_type:
-                return dbc.Alert("Please select a model and specify all training parameters.", color="warning"), dash.no_update, dash.no_update
-
-            try:
-                payload = {
-                    'model_name': model_name, # Or 'agent_type' / 'model_blueprint'
-                    'epochs': epochs,
-                    'batch_size': batch_size,
-                    'analysis_type': analysis_type
-                    # Potentially add a 'new_agent_id' or 'new_model_id' for the user to name it
-                }
-                # API call to start model training. 
-                # This endpoint should exist in api_server.py and interact with AIModelManager
-                response = requests.post(f"{self.api_base_url}/models/train", json=payload)
-                response.raise_for_status()
-                data = response.json()
-
-                status_msg = dbc.Alert(data.get("message", "Training initiated successfully."), color="success", className="mt-2")
-                
-                history_graph = html.Div()
-                if 'history' in data and data['history']:
-                    # Assuming history is a dict like {'loss': [...], 'val_loss': [...], ...}
-                    history_df = pd.DataFrame(data['history'])
-                    fig = go.Figure()
-                    for col in history_df.columns:
-                        if col.lower() != 'epoch': # Assuming 'epoch' is not a plottable metric here or handled differently
-                            fig.add_trace(go.Scatter(y=history_df[col], name=col, mode='lines+markers'))
-                
-                    fig.update_layout(title="Training History", xaxis_title="Epoch", yaxis_title="Metric Value", margin=dict(t=30, b=10, l=10, r=10), height=300)
-                    history_graph = dcc.Graph(figure=fig)
-            
-                metrics_display = html.Div([
-                    html.H6("Final Metrics:", className="mt-3"),
-                    dcc.Markdown(f"```json\n{json.dumps(data.get('metrics', {}), indent=2)}\n```")
-                ])
-            
-                return status_msg, history_graph, metrics_display
-            except requests.exceptions.RequestException as e:
-                error_detail = e.response.text if e.response else str(e)
-                return dbc.Alert(f"API Error during model training: {error_detail}", color="danger"), dash.no_update, dash.no_update
-            except Exception as e:
-                return dbc.Alert(f"An unexpected error occurred: {e}", color="danger"), dash.no_update, dash.no_update
-
-    def list_existing_models(self, pathname):
-        if pathname == "/models":
-            try:
-                return dbc.Alert("Fetching existing models...", color="info")
-            except Exception as e:
-                return dbc.Alert(f"Error fetching models: {e}", color="danger")
-        return dash.no_update
-
     def _setup_callbacks(self):
-        """Set up all Dash callbacks."""
-        # Navigation callback
-        @self.app.callback(Output('page-content', 'children'), [Input('url', 'pathname')])
-        def display_page(pathname):
-            return self._render_page_content(pathname)
-
-        # Agent callbacks
+        """Set up general Dash callbacks for system control and UI updates."""
         @self.app.callback(
-            Output("backtest-settings", "style"),
-            [Input("mode-selection", "value")]
+            [Output("backtest-settings", "style")],
+            [Input("backtest-mode", "value")]
         )
         def toggle_backtest_settings(mode):
             if mode == "backtest":
-                return {"display": "block"}
-            return {"display": "none"}
+                return [{"display": "block"}]
+            return [{"display": "none"}]
+            
+        @self.app.callback(
+            [Output("start-button", "children"),
+             Output("start-button", "color")],
+            [Input("start-button", "n_clicks")],
+            [State("start-button", "children")]
+        )
+        def handle_start_button(n_clicks, current_label):
+            if n_clicks is None:
+                raise PreventUpdate
+                
+            if current_label == "Start System":
+                # Start the system
+                return "Stop System", "danger"
+            else:
+                # Stop the system
+                return "Start System", "success"
 
-        # Model training callbacks
+        @self.app.callback(
+            Output("system-status", "children"),
+            [Input("start-button", "n_clicks")],
+            prevent_initial_call=True
+        )
+        def handle_start_system(n_clicks):
+            if n_clicks is None:
+                raise PreventUpdate
+                
+            try:
+                # Toggle system status
+                response = requests.post(f"{self.api_base_url}/system/toggle")
+                response.raise_for_status()
+                data = response.json()
+                return f"System is now {data.get('status', 'unknown')}"
+            except requests.exceptions.RequestException as e:
+                error_detail = e.response.text if e.response else str(e)
+                logger.error(f"API Error toggling system: {error_detail}")
+                return f"Error: {error_detail}"
+            except Exception as e:
+                logger.error(f"Error starting system: {e}")
+                return f"Error: {str(e)}"
+
+        @self.app.callback(
+            Output("existing-models-list", "children"),
+            [Input('url', 'pathname')] 
+        )
+        def list_existing_models_callback(pathname):
+            return self.list_existing_models(pathname)
+
         @self.app.callback(
             [Output('model-training-status', 'children'),
              Output('model-training-history-graph', 'children'),
@@ -807,14 +1131,15 @@ class DashDashboard:
                     for col in history_df.columns:
                         if col.lower() != 'epoch':
                             fig.add_trace(go.Scatter(y=history_df[col], name=col, mode='lines+markers'))
+                
                     fig.update_layout(title="Training History", xaxis_title="Epoch", yaxis_title="Metric Value", margin=dict(t=30, b=10, l=10, r=10), height=300)
                     history_graph = dcc.Graph(figure=fig)
-                
+            
                 metrics_display = html.Div([
                     html.H6("Final Metrics:", className="mt-3"),
                     dcc.Markdown(f"```json\n{json.dumps(data.get('metrics', {}), indent=2)}\n```")
                 ])
-                
+            
                 return status_msg, history_graph, metrics_display
             except requests.exceptions.RequestException as e:
                 error_detail = e.response.text if e.response else str(e)
@@ -822,34 +1147,26 @@ class DashDashboard:
             except Exception as e:
                 return dbc.Alert(f"An unexpected error occurred: {e}", color="danger"), dash.no_update, dash.no_update
 
-        # Existing models callback
-        @self.app.callback(
-            Output('existing-models-list', 'children'),
-            [Input('url', 'pathname')] 
-        )
-        def list_existing_models_callback(pathname):
-            return self.list_existing_models(pathname)
-
-    def run(self):
-        def list_existing_models(pathname):
-            if pathname == "/models":
-                try:
-                    # response = requests.get(f"{self.api_base_url}/models") # Or /agents if models are part of agents
-                    # response.raise_for_status()
-                    # models = response.json()
-                    # model_list_items = [dbc.ListGroupItem(f"{m.get('name', m.get('id'))} - Type: {m.get('type')}") for m in models]
-                    # return dbc.ListGroup(model_list_items)
-                    return dbc.Alert("Fetching existing models... (API call pending)", color="info") # Placeholder
-                except Exception as e:
-                    return dbc.Alert(f"Error fetching models: {e}", color="danger")
-            return dash.no_update
+    def list_existing_models(self, pathname):
+        if pathname == "/models":
+            try:
+                # response = requests.get(f"{self.api_base_url}/models") # Or /agents if models are part of agents
+                # response.raise_for_status()
+                # models = response.json()
+                # model_list_items = [dbc.ListGroupItem(f"{m.get('name', m.get('id'))} - Type: {m.get('type')}") for m in models]
+                # return dbc.ListGroup(model_list_items)
+                return dbc.Alert("Fetching existing models... (API call pending)", color="info") # Placeholder
+            except Exception as e:
+                return dbc.Alert(f"Error fetching models: {e}", color="danger")
+        return dash.no_update
 
     def run(self):
         """Run the Dash app. For production, use a proper WSGI server like Gunicorn or Waitress."""
         try:
             self.app.run_server(debug=True, port=self.dashboard_port, host='0.0.0.0')
         except Exception as e:
-            print(f"Error running dashboard: {e}")
+            logger.error(f"Error running dashboard: {e}")
+            raise
 
 # Example usage (for direct script execution, not for production)
 if __name__ == '__main__':

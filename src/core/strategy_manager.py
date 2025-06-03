@@ -30,6 +30,7 @@ from src.strategies.ray_dalio_ai import RayDalioAI
 from src.strategies.momentum_strategy import MomentumStrategy
 from src.strategies.mean_reversion_strategy import MeanReversionStrategy
 from src.strategies.economic_macro_strategy import EconomicMacroStrategy
+from src.strategies.emerging_markets_strategy import EmergingMarketsStrategy
 from src.core.base_manager import BaseManager
 
 
