@@ -202,58 +202,32 @@ class DataManager:
         retry_interval = self.config.get('data_sources', {}).get('market_data', {}).get('retry_interval', 10)
         max_retries = self.config.get('data_sources', {}).get('market_data', {}).get('max_retries', 5)
         
-        retry_count = 0
-        
         while self.running:
             try:
-                symbols = self.watchlist
-                if not symbols:
-                    logger.warning("No symbols configured for market data feed")
-                    break
+                # Get current market data for all symbols
+                market_data = await self.get_current_market_data()
                 
-                for symbol in symbols:
-                    try:
-                        # Add delay between requests to avoid rate limiting
-                        await asyncio.sleep(1)
-                        
-                        # Try to load data with retries
-                        data = None
-                        for attempt in range(max_retries):
-                            try:
-                                data = await self._load_symbol_data(symbol)
-                                if data is not None:
-                                    break
-                                await asyncio.sleep(retry_interval)
-                            except Exception as e:
-                                logger.error(f"Attempt {attempt + 1}/{max_retries} failed for {symbol}: {e}")
-                                if attempt < max_retries - 1:
-                                    await asyncio.sleep(retry_interval * (attempt + 1))  # Exponential backoff
-                        
-                        if data is not None:
-                            # Extract price data
-                            price_data = data['price_data']
-                            if not price_data.empty:
-                                self.market_data[symbol] = {
-                                    'price': price_data['Close'].iloc[-1],
-                                    'volume': price_data['Volume'].iloc[-1],
-                                    'high': price_data['High'].iloc[-1],
-                                    'low': price_data['Low'].iloc[-1]
-                                }
-                    except Exception as e:
-                        logger.error(f"Error processing market data for {symbol}: {e}")
-                        # Reset retry interval for each symbol
-                        retry_interval = 10
+                # Process market data
+                for symbol, data_dict in market_data['market_data'].items():
+                    data = data_dict.get('data', pd.DataFrame())
+                    if data.empty:
+                        continue
+                    
+                    # Update technical indicators
+                    technical_data = self.technical_analyzer.calculate_all(data)
+                    self.market_data[symbol]['technical_indicators'] = technical_data
+                    
+                    # Update sentiment analysis if needed
+                    if symbol in market_data['sentiment_data']:
+                        self.sentiment_data[symbol] = market_data['sentiment_data'][symbol]
                 
-                await asyncio.sleep(update_interval)
-            except asyncio.CancelledError:
-                logger.info("Market data feed cancelled")
-                break
+                # Wait for next update
+                await asyncio.sleep(self.config.get('system', {}).get('market_data_interval', 60))
+                
             except Exception as e:
                 logger.error(f"Error in market data feed: {e}")
-                # Exponential backoff for general errors
-                await asyncio.sleep(retry_interval)
-                retry_interval = min(retry_interval * 2, 300)  # Cap at 5 minutes
-    
+                await asyncio.sleep(60)  # Wait before retrying on errors
+                
     async def initialize(self):
         """Initialize data sources and load initial data."""
         logger.info("Initializing data sources...")

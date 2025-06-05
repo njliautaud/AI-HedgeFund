@@ -33,26 +33,26 @@ class APIServer:
     """
     
     def __init__(self, config, portfolio_manager, strategy_manager, risk_manager, data_manager):
-        """
-        Initialize the API server with system components.
-        
-        Args:
-            config: System configuration
-            portfolio_manager: Portfolio management component
-            strategy_manager: Strategy management component
-            risk_manager: Risk management component
-            data_manager: Data management component
-        """
+        """Initialize the API server."""
         self.config = config
         self.portfolio_manager = portfolio_manager
         self.strategy_manager = strategy_manager
         self.risk_manager = risk_manager
         self.data_manager = data_manager
         
-        self.api_port = self.config.get('ui', {}).get('api_port', 8081)
+        # Get API port from config
+        self.api_port = self.config.get('ui', {}).get('api_port', 8089)  # Using new port from config
+        
+        # Initialize Flask app
+        self.app = Flask(__name__)
+        self.app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
+        self.app.config['JSON_SORT_KEYS'] = False
+        
+        # Register routes
+        self._register_routes()
+        
         self.api_thread = None
         self.running = False
-        self.app = None
         self.server = None
         
     async def start(self):
@@ -75,23 +75,22 @@ class APIServer:
         # The thread will terminate when the main process exits
         
     def _run_api_server(self):
-        """
-        Run the Flask API server.
-        """
-        self.app = Flask(__name__)
-        self._setup_routes()
+        """Run the Flask API server."""
+        self.app.run(
+            host='0.0.0.0',
+            port=self.api_port,
+            threaded=True,
+            debug=self.config.get('debug', False)
+        )
         
-        # Run the Flask app
-        self.app.run(host='0.0.0.0', port=self.api_port, debug=False, use_reloader=False)
-        
-    def _setup_routes(self):
+    def _register_routes(self):
         """
         Set up the API routes.
         """
         app = self.app
         
         # API documentation
-        @app.route('/')
+        @self.app.route('/')
         def api_docs():
             return jsonify({
                 'name': 'AI Hedge Fund API',
@@ -110,13 +109,37 @@ class APIServer:
                     {'path': '/strategies/<strategy_id>/signals', 'method': 'GET', 'description': 'Get strategy signals'},
                     {'path': '/market/data/<symbol>', 'method': 'GET', 'description': 'Get market data for a symbol'},
                     {'path': '/market/economic/<indicator>', 'method': 'GET', 'description': 'Get economic indicator data'},
-                    {'path': '/risk/metrics', 'method': 'GET', 'description': 'Get risk metrics'},
-                    {'path': '/risk/alerts', 'method': 'GET', 'description': 'Get risk alerts'}
+                    {'path': '/risk/metrics', 'method': 'GET', 'description': 'Get risk metrics'}
                 ]
             })
+            
+        @self.app.route('/api/v1/portfolio', methods=['GET'])
+        def get_portfolio():
+            portfolio = self.portfolio_manager.get_portfolio()
+            return jsonify(portfolio.to_dict())
+            
+        @self.app.route('/api/v1/risk', methods=['GET'])
+        def get_risk_metrics():
+            metrics = self.risk_manager.get_current_metrics()
+            return jsonify(metrics)
+            
+        @self.app.route('/api/v1/market-data/<symbol>', methods=['GET'])
+        def get_market_data(symbol):
+            data = self.data_manager.get_current_market_data(symbol)
+            return jsonify(data)
+            
+        @self.app.route('/api/v1/control', methods=['POST'])
+        def control_system():
+            data = request.json
+            action = data.get('action')
+            if action == 'start':
+                asyncio.run(self.portfolio_manager.start_trading())
+            elif action == 'stop':
+                asyncio.run(self.portfolio_manager.stop_trading())
+            return jsonify({'status': 'success'})
         
         # System endpoints
-        @app.route('/system/status')
+        @self.app.route('/system/status')
         def system_status():
             return jsonify({
                 'status': 'running' if self.running else 'stopped',
@@ -131,7 +154,7 @@ class APIServer:
                 }
             })
         
-        @app.route('/system/start', methods=['POST'])
+        @self.app.route('/system/start', methods=['POST'])
         def system_start():
             # In a real implementation, this would trigger the system to start
             return jsonify({
@@ -140,7 +163,7 @@ class APIServer:
                 'timestamp': datetime.now().isoformat()
             })
         
-        @app.route('/system/stop', methods=['POST'])
+        @self.app.route('/system/stop', methods=['POST'])
         def system_stop():
             # In a real implementation, this would trigger the system to stop
             return jsonify({
@@ -150,7 +173,7 @@ class APIServer:
             })
         
         # Portfolio endpoints
-        @app.route('/portfolio/summary')
+        @self.app.route('/portfolio/summary')
         def portfolio_summary():
             # In a real implementation, this would get data from the portfolio manager
             return jsonify({

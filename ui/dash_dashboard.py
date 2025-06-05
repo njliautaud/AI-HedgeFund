@@ -65,8 +65,10 @@ class DashDashboard:
         self.agent_manager = agent_manager 
         self.ai_model_manager = agent_manager.ai_model_manager if agent_manager else None
         
-        self.dashboard_port = self.config.get('ui', {}).get('dashboard_port', 8080)
-        self.api_base_url = f"http://localhost:{self.config.get('ui', {}).get('api_port', 8081)}/api/v1" # Added API base URL
+        self.dashboard_port = self.config.get('ui', {}).get('dashboard_port', 8088)  # Using new port from config
+        # Get API port from config
+        api_port = self.config.get('ui', {}).get('api_port', 8089)
+        self.api_base_url = f"http://localhost:{api_port}/api/v1"
         self.dashboard_thread = None
         self.running = False
         
@@ -82,12 +84,28 @@ class DashDashboard:
         # Set up the layout using URL routing
         self.app.layout = self._create_main_layout() # Changed to main layout for routing
         
-        # Set up callbacks
-        self._setup_navigation_callbacks() # For page routing
-        self._setup_callbacks() # General system control callbacks
-        self._setup_agent_callbacks() # Agent-specific callbacks
-        self._setup_model_training_callbacks() # Model training callbacks
-        self._setup_emerging_markets_callbacks() # Emerging markets callbacks
+        # Set up callbacks using decorators
+        @self.app.callback(
+            Output("page-content", "children"),
+            Input("url", "pathname")
+        )
+        def display_page(pathname):
+            return self._render_page_content(pathname)
+            
+        @self.app.callback(
+            Output("agent-details", "children"),
+            Input("agent-select", "value"),
+            State("url", "pathname")
+        )
+        def display_agent_details(agent_id, pathname):
+            return self._create_agent_details(agent_id, pathname)
+            
+        @callback(
+            Output("market-data", "children"),
+            Input("interval-component", "n_intervals")
+        )
+        def update_emerging_markets(n_intervals):
+            return self._update_emerging_markets(n_intervals)
             
         # Add other specific callback setups here (e.g., portfolio, strategy)
     
@@ -553,115 +571,154 @@ class DashDashboard:
             ])
         ])
 
-    def _create_overview_page(self):
-        """Creates the layout for the Overview page."""
+    def _create_portfolio_content(self):
+        """Create the portfolio management content with real-time data and simulation features."""
         return html.Div([
-            html.H1("AI Hedge Fund Dashboard", className="mb-4"),
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("Portfolio Value"),
-                        dbc.CardBody([
-                            html.H2("$1,234,567.89", className="card-title"),
-                            html.P("+2.34% Today", className="text-success mb-0"),
-                            html.P("+12.45% YTD", className="text-success")
-                        ])
-                    ], className="mb-4"),
-                ], md=4),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("Performance"),
-                        dbc.CardBody([
-                            dcc.Graph(
-                                figure={
-                                    'data': [
-                                        {'x': ['Jan', 'Feb', 'Mar', 'Apr', 'May'], 
-                                         'y': [100, 110, 105, 120, 115], 
-                                         'type': 'line', 
-                                         'name': 'Portfolio'},
-                                        {'x': ['Jan', 'Feb', 'Mar', 'Apr', 'May'], 
-                                         'y': [100, 108, 102, 115, 112], 
-                                         'type': 'line', 
-                                         'name': 'Benchmark'}
+            dbc.Card([
+                dbc.CardHeader(html.H4("Portfolio Simulation")),
+                dbc.CardBody([
+                    # Add portfolio simulation controls
+                    dbc.Row([
+                        dbc.Col([
+                            dbc.InputGroup([
+                                dbc.InputGroupText("Initial Capital"),
+                                dbc.Input(
+                                    id="initial-capital",
+                                    value="100000",
+                                    type="number",
+                                    min="0"
+                                ),
+                                dbc.InputGroupText("$")
+                            ])
+                        ], width=3),
+                        dbc.Col([
+                            dbc.InputGroup([
+                                dbc.InputGroupText("Risk Level"),
+                                dbc.Select(
+                                    id="risk-level",
+                                    options=[
+                                        {'label': 'Conservative', 'value': 'conservative'},
+                                        {'label': 'Moderate', 'value': 'moderate'},
+                                        {'label': 'Aggressive', 'value': 'aggressive'}
                                     ],
-                                    'layout': {
-                                        'height': 200,
-                                        'margin': {'l': 20, 'r': 20, 't': 20, 'b': 20},
-                                        'showlegend': False
-                                    }
-                                }
+                                    value='moderate'
+                                )
+                            ])
+                        ], width=3),
+                        dbc.Col([
+                            dbc.Button(
+                                "Start Simulation",
+                                id="start-simulation",
+                                color="primary",
+                                className="mt-2"
                             )
-                        ])
-                    ]),
-                ], md=8)
-            ]),
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("Top Positions"),
-                        dbc.CardBody([
-                            dbc.Table([
-                                html.Thead(html.Tr([
-                                    html.Th("Symbol"),
-                                    html.Th("Shares"),
-                                    html.Th("Avg Price"),
-                                    html.Th("Market Value"),
-                                    html.Th("P&L")
-                                ])),
-                                html.Tbody([
-                                    html.Tr([
-                                        html.Td("AAPL"),
-                                        html.Td("100"),
-                                        html.Td("$150.00"),
-                                        html.Td("$15,000.00"),
-                                        html.Td("+$2,000.00", className="text-success")
-                                    ]),
-                                    html.Tr([
-                                        html.Td("MSFT"),
-                                        html.Td("50"),
-                                        html.Td("$300.00"),
-                                        html.Td("$15,000.00"),
-                                        html.Td("+$1,500.00", className="text-success")
-                                    ])
-                                ])
-                            ], bordered=True, hover=True, responsive=True, className="table-sm")
-                        ])
+                        ], width=3)
+                    ], className="mb-4"),
+                    
+                    # Add portfolio performance metrics
+                    dbc.Row([
+                        dbc.Col([
+                            html.H6("Backtest Performance"),
+                            html.H3("+12.5%"),
+                            html.P("Since Inception", className="text-muted")
+                        ], width=3),
+                        dbc.Col([
+                            html.H6("Sharpe Ratio"),
+                            html.H3("1.85"),
+                            html.P("Risk-adjusted return", className="text-muted")
+                        ], width=3),
+                        dbc.Col([
+                            html.H6("Max Drawdown"),
+                            html.H3("-5.2%"),
+                            html.P("Worst period", className="text-danger")
+                        ], width=3),
+                        dbc.Col([
+                            html.H6("Win Rate"),
+                            html.H3("78%"),
+                            html.P("Positive trades", className="text-success")
+                        ], width=3)
+                    ], className="mb-4"),
+                    
+                    # Add portfolio holdings table
+                    dbc.Row([
+                        dbc.Col([
+                            html.H6("Current Holdings"),
+                            dash_table.DataTable(
+                                id='portfolio-table',
+                                columns=[
+                                    {'name': 'Symbol', 'id': 'symbol'},
+                                    {'name': 'Name', 'id': 'name'},
+                                    {'name': 'Weight', 'id': 'weight'},
+                                    {'name': 'Current Price', 'id': 'current_price'},
+                                    {'name': '1D %', 'id': 'daily_change'},
+                                    {'name': '1W %', 'id': 'weekly_change'},
+                                    {'name': '1M %', 'id': 'monthly_change'}
+                                ],
+                                data=[],
+                                style_table={'overflowX': 'auto'},
+                                style_cell={'textAlign': 'center'},
+                                style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold'},
+                                style_data_conditional=[
+                                    {
+                                        'if': {
+                                            'filter_query': '{daily_change} < 0',
+                                            'column_id': 'daily_change'
+                                        },
+                                        'color': 'red'
+                                    },
+                                    {
+                                        'if': {
+                                            'filter_query': '{daily_change} > 0',
+                                            'column_id': 'daily_change'
+                                        },
+                                        'color': 'green'
+                                    }
+                                ]
+                            )
+                        ], width=12)
                     ])
-                ], md=6),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("Recent Trades"),
-                        dbc.CardBody([
-                            dbc.Table([
-                                html.Thead(html.Tr([
-                                    html.Th("Date"),
-                                    html.Th("Symbol"),
-                                    html.Th("Action"),
-                                    html.Th("Shares"),
-                                    html.Th("Price")
-                                ])),
-                                html.Tbody([
-                                    html.Tr([
-                                        html.Td("2023-06-01"),
-                                        html.Td("AAPL"),
-                                        html.Td("BUY", className="text-success"),
-                                        html.Td("50"),
-                                        html.Td("$170.00")
-                                    ]),
-                                    html.Tr([
-                                        html.Td("2023-05-30"),
-                                        html.Td("MSFT"),
-                                        html.Td("SELL", className="text-danger"),
-                                        html.Td("25"),
-                                        html.Td("$320.00")
-                                    ])
-                                ])
-                            ], bordered=True, hover=True, responsive=True, className="table-sm")
-                        ])
-                    ])
-                ], md=6)
-            ], className="mt-4")
+                ])
+            ])
         ])
+
+        # Add callback for portfolio table updates
+        @self.app.callback(
+            Output("portfolio-table", "data"),
+            Input("interval-component", "n_intervals"),
+            prevent_initial_call=True
+        )
+        def update_portfolio_table(n_intervals):
+            """Update portfolio holdings with real-time data."""
+            try:
+                # Get real-time market data
+                portfolio_data = []
+                if self.data_manager and hasattr(self, 'portfolio_manager') and self.portfolio_manager:
+                    # Get current holdings
+                    holdings = self.portfolio_manager.get_holdings()
+                    for symbol in holdings:
+                        # Get latest market data
+                        data = self.data_manager.get_current_market_data(symbol)
+                        if data:
+                            # Calculate percentage changes
+                            daily_change = ((data['close'] / data['close'].shift(1) - 1) * 100).iloc[-1]
+                            weekly_change = ((data['close'] / data['close'].shift(5) - 1) * 100).iloc[-1]
+                            monthly_change = ((data['close'] / data['close'].shift(21) - 1) * 100).iloc[-1]
+                            
+                            # Add to portfolio data
+                            portfolio_data.append({
+                                'symbol': symbol,
+                                'name': symbol,  # Could be enhanced with a security name lookup
+                                'weight': '10%',  # Placeholder - should come from portfolio manager
+                                'current_price': f"${data['close'].iloc[-1]:.2f}",
+                                'daily_change': f"{daily_change:.2f}%",
+                                'weekly_change': f"{weekly_change:.2f}%",
+                                'monthly_change': f"{monthly_change:.2f}%"
+                            })
+                return portfolio_data
+            except Exception as e:
+                logger.error(f"Error updating portfolio table: {e}")
+                return []
+
         
     def _create_portfolio_page(self):
         """Creates the layout for the Portfolio page."""

@@ -68,10 +68,12 @@ class RiskManager:
         while self.monitoring:
             try:
                 # Get current portfolio state
-                portfolio = await portfolio_manager.get_portfolio()
+                portfolio = portfolio_manager.get_portfolio()
                 
                 # Calculate portfolio risk metrics
-                risk_metrics = self.calculate_portfolio_risk(portfolio['returns'])
+                # Note: We need to get returns from portfolio positions
+                returns = [pos.return_pct for pos in portfolio.positions.values()]
+                risk_metrics = self.calculate_portfolio_risk(returns)
                 
                 # Check for risk threshold breaches
                 await self._check_risk_thresholds(risk_metrics, portfolio)
@@ -94,19 +96,20 @@ class RiskManager:
         logger.info("Stopping Risk Manager monitoring...")
         self.monitoring = False
         
-    async def _check_risk_thresholds(self, risk_metrics: Dict, portfolio: Dict):
+    async def _check_risk_thresholds(self, risk_metrics: Dict, portfolio):
         """
         Check risk metrics against thresholds and trigger alerts if needed.
         
         Args:
             risk_metrics: Dictionary of calculated risk metrics
-            portfolio: Current portfolio state
+            portfolio: Current portfolio state (Portfolio object)
         """
         alerts = []
         
         # Check position sizes
-        for symbol, position in portfolio['positions'].items():
-            position_size = position['value'] / portfolio['total_value']
+        total_value = portfolio.total_value
+        for symbol, position in portfolio.positions.items():
+            position_size = position.market_value / total_value
             if position_size > self.risk_params.max_position_size:
                 alerts.append(f"Position size for {symbol} ({position_size:.2%}) exceeds maximum allowed ({self.risk_params.max_position_size:.2%})")
         
@@ -119,8 +122,9 @@ class RiskManager:
             alerts.append(f"Portfolio volatility ({risk_metrics['volatility']:.2%}) exceeds maximum allowed ({self.risk_params.max_volatility:.2%})")
         
         # Check VaR
-        if risk_metrics['var_95'] < -self.risk_params.value_at_risk:
-            alerts.append(f"95% Value at Risk ({abs(risk_metrics['var_95']):.2%}) exceeds threshold ({self.risk_params.value_at_risk:.2%})")
+        risk_metrics_obj = risk_metrics['risk_metrics']
+        if risk_metrics_obj.var_95 < -self.risk_params.value_at_risk:
+            alerts.append(f"95% Value at Risk ({abs(risk_metrics_obj.var_95):.2%}) exceeds threshold ({self.risk_params.value_at_risk:.2%})")
         
         # Log alerts if any
         for alert in alerts:

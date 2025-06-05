@@ -94,16 +94,24 @@ class AIHedgeFund:
             global logger
             logger = get_logger()
             
-            # Initialize core components
+            logger.info("Initializing core components...")
             await self._initialize_core_components()
             
             # Initialize UI components
-            await self._initialize_ui_components()
+            logger.info("Initializing UI components...")
             
-            # Load saved state
+            # Initialize API server
+            self.api_server = APIServer(self.config, self.portfolio_manager, self.strategy_manager, self.risk_manager, self.data_manager)
+            await self.api_server.start()
+            
+            # Initialize dashboard
+            self.dashboard = Dashboard(self.config, self.portfolio_manager, self.strategy_manager, self.risk_manager, self.data_manager)
+            await self.dashboard.start()
+            
+            logger.info("Loading system state...")
             await self._load_system_state()
             
-            logger.info("AI Hedge Fund system initialized successfully")
+            logger.info("System initialization complete")
             
         except Exception as e:
             logger.error(f"Failed to initialize AI Hedge Fund system: {e}")

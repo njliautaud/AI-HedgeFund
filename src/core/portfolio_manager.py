@@ -540,44 +540,37 @@ class PortfolioManager:
         except Exception as e:
             logger.error(f"Error recording performance: {e}")
     
+    def get_portfolio(self) -> Portfolio:
+        """Get the current portfolio state."""
+        return self.portfolio
+
     def get_portfolio_summary(self) -> Dict[str, Any]:
         """Get comprehensive portfolio summary."""
-        # Calculate performance metrics
-        returns = np.array(self.portfolio.daily_returns)
-        
-        if len(returns) > 0:
-            total_return = (self.portfolio.total_value / 100000) - 1  # Assuming $100k start
-            annualized_return = np.mean(returns) * 252
-            volatility = np.std(returns) * np.sqrt(252)
-            sharpe_ratio = annualized_return / volatility if volatility > 0 else 0
-            max_drawdown = self._calculate_max_drawdown()
-        else:
-            total_return = annualized_return = volatility = sharpe_ratio = max_drawdown = 0
-        
-        return {
-            'portfolio_value': self.portfolio.total_value,
-            'cash': self.portfolio.cash,
-            'invested_value': self.portfolio.invested_value,
-            'total_pnl': self.portfolio.total_pnl,
-            'num_positions': self.portfolio.num_positions,
-            'cash_weight': self.portfolio.cash_weight,
-            'performance': {
-                'total_return': total_return,
-                'annualized_return': annualized_return,
-                'volatility': volatility,
-                'sharpe_ratio': sharpe_ratio,
-                'max_drawdown': max_drawdown
-            },
-            'top_positions': self._get_top_positions(),
-            'sector_allocation': self._get_sector_allocation(),
-            'last_updated': datetime.now()
-        }
-    
+        try:
+            current_value = self.portfolio.total_value
+            cash = self.portfolio.cash
+            invested = current_value - cash
+            
+            return {
+                'total_value': current_value,
+                'cash': cash,
+                'invested': invested,
+                'positions': len(self.portfolio.positions),
+                'total_pnl': self.portfolio.total_pnl,
+                'return_pct': (current_value - self.portfolio.inception_date) / self.portfolio.inception_date,
+                'max_drawdown': self._calculate_max_drawdown(),
+                'top_positions': self._get_top_positions(),
+                'sector_allocation': self._get_sector_allocation()
+            }
+        except Exception as e:
+            logger.error(f"Error getting portfolio summary: {e}")
+            raise
+
     def _calculate_max_drawdown(self) -> float:
         """Calculate maximum drawdown."""
         if len(self.performance_history) < 2:
             return 0.0
-        
+            
         values = [record['total_value'] for record in self.performance_history]
         peak = values[0]
         max_dd = 0.0
@@ -589,7 +582,7 @@ class PortfolioManager:
             max_dd = max(max_dd, drawdown)
         
         return max_dd
-    
+
     def _get_top_positions(self, n: int = 10) -> List[Dict[str, Any]]:
         """Get top N positions by weight."""
         positions = [

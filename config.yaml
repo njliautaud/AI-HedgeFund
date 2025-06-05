@@ -301,6 +301,11 @@ investment_strategies:
         max_sector_weight: 0.25
       weight: 0.1
 
+# UI Configuration
+ui:
+  dashboard_port: 8088  # Unique port for dashboard
+  api_port: 8089       # Unique port for API server
+
 # Economic Indicators
 economic_indicators:
   fed_data:

@@ -2,6 +2,111 @@
 
 A comprehensive AI-driven hedge fund infrastructure featuring multiple legendary investor AI strategies, economic analysis bots, real-time market analysis, portfolio management, and local AI model training.
 
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Python 3.8+
+- pip (Python package manager)
+- Git
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/AI-HedgeFund.git
+   cd AI-HedgeFund
+   ```
+
+2. Create and activate a virtual environment (recommended):
+   ```bash
+   # On Windows
+   python -m venv venv
+   .\venv\Scripts\activate
+   
+   # On macOS/Linux
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Set up environment variables:
+   - Copy `.env.example` to `.env` and update with your API keys
+   - For development, you can use the default configuration which uses free data sources
+
+### Running the Dashboard
+
+#### Production Mode
+
+1. Start the dashboard:
+   ```bash
+   python run_dashboard.py
+   ```
+
+2. Open your web browser and navigate to:
+   ```
+   http://localhost:8088
+   ```
+
+3. The API server will be available at:
+   ```
+   http://localhost:8089
+   ```
+
+#### Development Mode
+
+For development with auto-reload:
+
+```bash
+# Install development dependencies
+pip install watchdog
+
+# Run in development mode
+python run_dev.py
+```
+
+The development server will:
+- Automatically restart when Python files, YAML configs, or .env files change
+- Open the dashboard in your default web browser
+- Provide better error messages and logging
+
+### Testing
+
+Run the full test suite:
+
+```bash
+# Run all tests
+python run_tests.py
+
+# Run unit tests only
+pytest tests/unit/
+
+# Run functional tests only
+pytest tests/functional/
+
+# Run with coverage
+pytest --cov=./ tests/
+```
+
+### Testing
+
+To run the test suite:
+
+```bash
+# Install test dependencies
+pip install pytest pytest-asyncio pytest-cov requests
+
+# Run tests
+pytest tests/ -v
+
+# Run with coverage report
+pytest --cov=./ tests/ -v
+```
+
 ## System Architecture
 
 The AI Hedge Fund system is built with a modular architecture that separates concerns and allows for flexible deployment and scaling. Below is a high-level overview of the system architecture:
