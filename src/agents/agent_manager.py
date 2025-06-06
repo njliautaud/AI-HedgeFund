@@ -17,6 +17,7 @@ from loguru import logger
 from .agent_base import Agent, AgentAction, AgentState
 from .founding_agent import FoundingAgent
 from .warren_buffett_agent import WarrenBuffettAgent
+from .fundamental_analysis_agent import FundamentalAnalysisAgent
 
 # Import for future strategy agents
 # from .peter_lynch_agent import PeterLynchAgent
@@ -89,8 +90,16 @@ class AgentManager:
         """
         strategy_configs = self.config.get('investment_strategies', {})
         
+        # Fundamental Analysis Agent
+        if 'fundamental_analysis' in strategy_configs and strategy_configs['fundamental_analysis'].get('enabled', True):
+            self.strategy_agents['fundamental_analysis'] = FundamentalAnalysisAgent(
+                agent_id='fundamental_analysis_agent',
+                config=strategy_configs['fundamental_analysis']
+            )
+            logger.info("Fundamental Analysis Agent initialized")
+        
         # Warren Buffett Agent
-        if 'warren_buffett' in strategy_configs:
+        if 'warren_buffett' in strategy_configs and strategy_configs['warren_buffett'].get('enabled', True):
             self.strategy_agents['warren_buffett'] = WarrenBuffettAgent(
                 strategy_configs['warren_buffett'],
                 self.data_manager

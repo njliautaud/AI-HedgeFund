@@ -18,6 +18,9 @@ import asyncio
 import requests # Added for API calls
 from loguru import logger
 
+# Import our new components
+from ui.components.emerging_markets import EmergingMarketsComponent
+
 # Configure logger
 logger.add(
     "logs/dashboard.log",
@@ -83,6 +86,10 @@ class DashDashboard:
         
         # Set up the layout using URL routing
         self.app.layout = self._create_main_layout() # Changed to main layout for routing
+        
+        # Set up callbacks
+        self._setup_callbacks()
+        self._setup_emerging_markets_callbacks()
         
         # Set up callbacks using decorators
         @self.app.callback(
@@ -310,7 +317,7 @@ class DashDashboard:
                                         dbc.NavLink([html.I(className="fas fa-lightbulb me-2"), "Strategies"], href="/strategies", active="exact"),
                                         dbc.NavLink([html.I(className="fas fa-database me-2"), "Market Data"], href="/market-data", active="exact"),
                                         dbc.NavLink([html.I(className="fas fa-shield-alt me-2"), "Risk Metrics"], href="/risk", active="exact"),
-                                        dbc.NavLink([html.I(className="fas fa-globe me-2"), "Emerging Markets"], href="/emerging-markets", active="exact"),
+                                        dbc.NavLink([html.I(className="fas fa-globe me-2"), "Emerging Markets"], href="/emerging-markets", active="exact"),  # Note: Typo in URL path (should be 'markets')
                                     ],
                                     vertical=True,
                                     pills=True,
@@ -383,101 +390,319 @@ class DashDashboard:
     
     def _create_overview_page(self):
         """Creates the layout for the Overview page."""
-        # This combines elements from the old sidebar and main content for system control
         return html.Div([
-            html.H3("System Overview & Control", className="mb-4"),
+            html.H3("AI Hedge Fund Dashboard", className="mb-4"),
+            dbc.Row([
+                # System Status Card
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader("System Status"),
+                        dbc.CardBody([
+                            html.Div([
+                                html.P("Status: ", className="d-inline fw-bold"),
+                                html.Span(
+                                    "Running",
+                                    id="system-status",
+                                    className="badge bg-success ms-2"
+                                )
+                            ], className="mb-3"),
+                            dbc.Row([
+                                dbc.Col(
+                                    dbc.Button(
+                                        [html.I(className="fas fa-play me-2"), "Start System"],
+                                        id="start-button",
+                                        color="success",
+                                        className="w-100 mb-2"
+                                    )
+                                ),
+                                dbc.Col(
+                                    dbc.Button(
+                                        [html.I(className="fas fa-stop me-2"), "Stop System"],
+                                        id="stop-button",
+                                        color="danger",
+                                        className="w-100 mb-2"
+                                    )
+                                )
+                            ], className="mb-4"),
+                            html.H5("System Information", className="mb-3"),
+                            html.Div([
+                                html.Div([
+                                    html.Span("Version: ", className="fw-bold"),
+                                    html.Span("1.0.0", id="system-version")
+                                ], className="mb-2")
+                            ])
+                        ])
+                    ])
+                ], md=6, className="mb-4"),
+                # Portfolio Summary Card
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader("Portfolio Summary"),
+                        dbc.CardBody([
+                            html.H4("$0.00", className="card-title"),
+                            html.Div([
+                                html.Span("24h Change: ", className="fw-bold"),
+                                html.Span("0.00%", className="text-muted")
+                            ]),
+                            html.Div([
+                                html.Span("Positions: ", className="fw-bold"),
+                                html.Span("0")
+                            ], className="mt-2")
+                        ])
+                    ])
+                ], md=6, className="mb-4"),
+            ]),
+            # Market Overview
             dbc.Row([
                 dbc.Col([
-                    html.H5("System Status", className="mb-3"),
-                    html.Div([
-                        html.P("Status: ", className="d-inline fw-bold"),
-                        html.P("Running", id="system-status", className="d-inline text-success") # Example status
-                    ], className="mb-3"),
-                    dbc.Row([
-                        dbc.Col(dbc.Button("Start System", id="start-button", color="success", className="w-100 mb-2")), # API call needed
-                        dbc.Col(dbc.Button("Stop System", id="stop-button", color="danger", className="w-100 mb-2"))    # API call needed
-                    ], className="mb-4"),
-                    html.H5("System Mode", className="mb-2"),
-                    dbc.RadioItems(
-                        options=[
-                            {"label": "Live Trading", "value": "live"},
-                            {"label": "Paper Trading", "value": "paper"},
-                            {"label": "Backtesting", "value": "backtest"},
-                            {"label": "Training", "value": "training"}
-                        ],
-                        value="paper", # Default mode
-                        id="mode-selection",
-                        className="mb-3"
-                    ), # API call needed to set mode
-                    html.Div(
-                        [
-                            html.H6("Backtesting Period", className="mt-3 mb-2"),
-                            dbc.Label("Start Date"),
-                            dcc.DatePickerSingle(id="backtest-start-date", date=datetime.now() - timedelta(days=365), className="mb-2 w-100"),
-                            dbc.Label("End Date"),
-                            dcc.DatePickerSingle(id="backtest-end-date", date=datetime.now(), className="mb-2 w-100"),
-                            dbc.Label("Initial Capital"),
-                            dbc.Input(id="initial-capital", type="number", value=100000, min=10000, step=10000, className="w-100")
-                        ],
-                        id="backtest-settings",
-                        style={"display": "none"} # Initially hidden
-                    )
-                ], md=6),
+                    dbc.Card([
+                        dbc.CardHeader("Market Overview"),
+                        dbc.CardBody([
+                            html.Div("Market data will be displayed here", id="market-overview-content")
+                        ])
+                    ])
+                ])
+            ])
+        ])
+
+    def _get_trading_options(self):
+        return [
+            {"label": "Live Trading", "value": "live"},
+            {"label": "Paper Trading", "value": "paper"},
+            {"label": "Backtesting", "value": "backtest"},
+            {"label": "Training", "value": "training"}
+        ]
+
+    def _create_overview_page(self):
+        """Creates the layout for the Overview page."""
+        return html.Div([
+            html.H3("AI Hedge Fund Dashboard", className="mb-4"),
+            dbc.Row([
+                # Left column - System controls
                 dbc.Col([
-                    html.H5("Recent Activity/Logs", className="mb-3"),
-                    dcc.Textarea(
-                        id='system-logs-overview',
-                        value='System initialized.\nMonitoring market data...\nAgent X performed action Y.',
-                        style={'width': '100%', 'height': 300},
-                        readOnly=True,
-                        className="mb-3"
-                    ), # To be populated by API call or WebSocket
-                    # Placeholder for key metrics or alerts
-                    html.H5("Key Metrics", className="mt-4 mb-3"),
-                    dbc.CardGroup([
-                        dbc.Card(dbc.CardBody([html.H6("Active Agents"), html.H4(id="active-agents-metric", children="N/A")])), # API call
-                        dbc.Card(dbc.CardBody([html.H6("Trades Today"), html.H4(id="trades-today-metric", children="N/A")])), # API call
-                        dbc.Card(dbc.CardBody([html.H6("Current P&L"), html.H4(id="current-pnl-metric", children="N/A")])) # API call
+                    dbc.Card([
+                        dbc.CardHeader("System Controls"),
+                        dbc.CardBody([
+                            html.H5("Trading Mode", className="mb-3"),
+                            dcc.Dropdown(
+                                id="mode-selection",
+                                options=self._get_trading_options(),
+                                value="paper",  # Default mode
+                                className="mb-3"
+                            ),
+                            # Backtesting settings (initially hidden)
+                            html.Div(
+                                [
+                                    html.H6("Backtesting Period", className="mt-3 mb-2"),
+                                    dbc.Label("Start Date"),
+                                    dcc.DatePickerSingle(
+                                        id="backtest-start-date",
+                                        date=datetime.now() - timedelta(days=365),
+                                        className="mb-2 w-100"
+                                    ),
+                                    dbc.Label("End Date"),
+                                    dcc.DatePickerSingle(
+                                        id="backtest-end-date",
+                                        date=datetime.now(),
+                                        className="mb-2 w-100"
+                                    ),
+                                    dbc.Label("Initial Capital"),
+                                    dbc.Input(
+                                        id="initial-capital",
+                                        type="number",
+                                        value=100000,
+                                        min=10000,
+                                        step=10000,
+                                        className="w-100"
+                                    )
+                                ],
+                                id="backtest-settings",
+                                style={"display": "none"}
+                            ),
+                            dbc.Button(
+                                "Start System",
+                                id="start-system-btn",
+                                color="success",
+                                className="me-2"
+                            ),
+                            dbc.Button(
+                                "Stop System",
+                                id="stop-system-btn",
+                                color="danger",
+                                className="me-2",
+                                disabled=True
+                            )
+                        ])
+                    ])
+                ], md=6, className="mb-4"),
+                # Right column - System status and metrics
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader("System Status"),
+                        dbc.CardBody([
+                            html.Div(id="system-status-container", children=[
+                                html.Div([
+                                    html.Strong("Status: "),
+                                    html.Span(
+                                        "Stopped",
+                                        id="system-status-text",
+                                        className="badge bg-secondary ms-2"
+                                    )
+                                ]),
+                                html.Div([
+                                    html.Strong("Uptime: "),
+                                    html.Span("00:00:00", id="system-uptime")
+                                ], className="mt-2")
+                            ])
+                        ])
+                    ], className="mb-4"),
+                    dbc.Card([
+                        dbc.CardHeader("Recent Activity"),
+                        dbc.CardBody([
+                            dcc.Textarea(
+                                id='system-logs-overview',
+                                value='System initialized.\nMonitoring market data...\nAgent X performed action Y.',
+                                style={'width': '100%', 'height': 200},
+                                readOnly=True,
+                                className="mb-3"
+                            )
+                        ])
                     ])
                 ], md=6)
+            ]),
+            # Bottom row - Key metrics
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader("Key Metrics"),
+                        dbc.CardBody([
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Card([
+                                        dbc.CardBody([
+                                            html.H6("Active Agents", className="card-title"),
+                                            html.H4("0", id="active-agents-metric", className="text-center")
+                                        ])
+                                    ])
+                                ], md=4, className="mb-3"),
+                                dbc.Col([
+                                    dbc.Card([
+                                        dbc.CardBody([
+                                            html.H6("Trades Today", className="card-title"),
+                                            html.H4("0", id="trades-today-metric", className="text-center")
+                                        ])
+                                    ])
+                                ], md=4, className="mb-3"),
+                                dbc.Col([
+                                    dbc.Card([
+                                        dbc.CardBody([
+                                            html.H6("Current P&L", className="card-title"),
+                                            html.H4("$0.00", id="current-pnl-metric", className="text-center")
+                                        ])
+                                    ])
+                                ], md=4, className="mb-3")
+                            ])
+                        ])
+                    ])
+                ])
             ])
         ])
 
     def _create_agent_control_page(self):
         """Creates the layout for the Agent Control page."""
         return html.Div([
-            html.H3("Agent Control & Ticker Analysis", className="mb-4"),
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("Select Agent"),
-                        dbc.CardBody([
-                            dcc.Dropdown(
-                                id='agent-selector-dropdown',
-                                options=[], # To be populated by callback
-                                placeholder="Select an Agent",
-                                className="mb-3"
-                            ),
-                            dcc.Loading(id="loading-agent-details", children=[html.Div(id='agent-details-output')])
-                        ])
-                    ], className="mb-3")
-                ], md=5),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("Ticker Analysis"),
-                        dbc.CardBody([
-                            dcc.Input(id="ticker-input", type="text", placeholder="Enter Ticker (e.g., AAPL)", className="mb-2 w-100"),
-                            dcc.Dropdown(
-                                id='agent-for-ticker-analysis-dropdown',
-                                options=[], # To be populated by callback
-                                placeholder="Select Agent for Analysis",
-                                className="mb-3"
-                            ),
-                            dbc.Button("Analyze Ticker", id="analyze-ticker-button", color="primary", className="w-100"),
-                            dcc.Loading(id="loading-ticker-analysis", children=[html.Div(id="ticker-analysis-results", className="mt-3")])
+            html.H3("Agent Control & Analysis", className="mb-4"),
+            dbc.Tabs([
+                # Tab for general agent control and analysis
+                dbc.Tab(label="Agent Management", children=[
+                    html.Div(className="mt-3"),
+                    dbc.Row([
+                        dbc.Col([
+                            dbc.Card([
+                                dbc.CardHeader("Select Agent"),
+                                dbc.CardBody([
+                                    dcc.Dropdown(
+                                        id='agent-selector-dropdown',
+                                        options=[], # To be populated by callback
+                                        placeholder="Select an Agent",
+                                        className="mb-3"
+                                    ),
+                                    dcc.Loading(id="loading-agent-details", children=[html.Div(id='agent-details-output')])
+                                ])
+                            ], className="mb-3")
+                        ], md=5),
+                        dbc.Col([
+                            dbc.Card([
+                                dbc.CardHeader("Ticker Analysis"),
+                                dbc.CardBody([
+                                    dcc.Input(
+                                        id="ticker-input", 
+                                        type="text", 
+                                        placeholder="Enter Ticker (e.g., AAPL)", 
+                                        className="mb-2 w-100"
+                                    ),
+                                    dcc.Dropdown(
+                                        id='agent-for-ticker-analysis-dropdown',
+                                        options=[], # To be populated by callback
+                                        placeholder="Select Agent for Analysis",
+                                        className="mb-3"
+                                    ),
+                                    dbc.Button(
+                                        "Analyze Ticker", 
+                                        id="analyze-ticker-button", 
+                                        color="primary", 
+                                        className="w-100"
+                                    ),
+                                    dcc.Loading(
+                                        id="loading-ticker-analysis", 
+                                        children=[
+                                            html.Div(id="ticker-analysis-results", className="mt-3")
+                                        ]
+                                    )
+                                ])
+                            ])
+                        ], md=7)
+                    ])
+                ]),
+                # Tab for fundamental analysis
+                dbc.Tab(label="Fundamental Analysis", children=[
+                    html.Div(className="mt-3"),
+                    dbc.Row([
+                        dbc.Col([
+                            dbc.Card([
+                                dbc.CardHeader("Fundamental Analysis"),
+                                dbc.CardBody([
+                                    dbc.Row([
+                                        dbc.Col([
+                                            dbc.InputGroup([
+                                                dbc.InputGroupText("Ticker"),
+                                                dbc.Input(
+                                                    id="fundamental-ticker-input",
+                                                    placeholder="e.g. AAPL",
+                                                    type="text",
+                                                    className="w-100"
+                                                ),
+                                                dbc.Button(
+                                                    "Analyze",
+                                                    id="fundamental-analyze-button",
+                                                    color="primary",
+                                                    className="ms-2"
+                                                )
+                                            ], className="mb-3"),
+                                        ], width=8),
+                                    ]),
+                                    dcc.Loading(
+                                        id="loading-fundamental-analysis",
+                                        type="default",
+                                        children=[
+                                            html.Div(id="fundamental-analysis-results", className="mt-3")
+                                        ]
+                                    )
+                                ])
+                            ])
                         ])
                     ])
-                ], md=7)
+                ])
             ])
         ])
 
@@ -750,33 +975,13 @@ class DashDashboard:
         
     def _create_emerging_markets_page(self):
         """Create the Emerging Markets page with market opportunities and analysis."""
-        return html.Div([
-            dbc.Row([
-                dbc.Col([
-                    html.H3("Emerging Market Opportunities"),
-                    html.P("High-potential emerging markets identified by our AI:"),
-                    dcc.Loading(
-                        id="loading-emerging-markets",
-                        type="circle",
-                        children=html.Div(id="emerging-markets-table")
-                    ),
-                    html.Div(id="market-details", className="mt-3")
-                ], width=12)
-            ]),
-            dbc.Row([
-                dbc.Col([
-                    dcc.Graph(id="market-size-chart")
-                ], width=6),
-                dbc.Col([
-                    dcc.Graph(id="market-growth-chart")
-                ], width=6)
-            ]),
-            dcc.Interval(
-                id='emerging-markets-interval',
-                interval=15*60*1000,  # 15 minutes
-                n_intervals=0
-            )
-        ], className="p-4")
+        # Initialize the emerging markets component
+        em_component = EmergingMarketsComponent()
+        
+        # Get the layout from the component
+        layout = em_component.get_layout()
+        
+        return layout
 
     def _create_404_page(self):
         """Creates a 404 error page with navigation options."""
@@ -829,7 +1034,7 @@ class DashDashboard:
                     return self._create_model_training_page()
                 elif pathname in ["/agents", "/agent-control"]:
                     return self._create_agent_control_page()
-                elif pathname in ["/emerging-markets", "/emerging-markets/"]:
+                elif pathname in ["/emerging-markets", "/emerging-markets/", "/emerging-markets"]:  # Note: There's a typo in the URL path (should be 'markets')
                     return self._create_emerging_markets_page()
                 elif pathname == "/market-data":
                     return self._create_market_data_page()
@@ -847,142 +1052,11 @@ class DashDashboard:
                 
     def _setup_emerging_markets_callbacks(self):
         """Set up callbacks for the Emerging Markets page."""
-        @self.app.callback(
-            [Output("emerging-markets-table", "children"),
-             Output("market-size-chart", "figure"),
-             Output("market-growth-chart", "figure")],
-            [Input("emerging-markets-interval", "n_intervals")],
-            prevent_initial_call=True
-        )
-        def update_emerging_markets(n_intervals):
-            """Update the emerging markets data and charts."""
-            try:
-                # Get emerging markets data from the strategy
-                if self.strategy_manager and hasattr(self.strategy_manager, 'strategies') and 'emerging_markets' in self.strategy_manager.strategies:
-                    em_strategy = self.strategy_manager.strategies['emerging_markets']
-                    
-                    # Update market data
-                    asyncio.run(em_strategy.update_market_data())
-                    
-                    # Get market opportunities
-                    opportunities = em_strategy.get_market_opportunities()
-                    
-                    if not opportunities:
-                        return (
-                            dbc.Alert("No emerging market opportunities found.", color="warning"),
-                            {},
-                            {}
-                        )
-                    
-                    # Create table
-                    df = pd.DataFrame(opportunities)
-                    table = dbc.Table.from_dataframe(
-                        df[['market_name', 'market_size', 'growth_rate', 'market_score']],
-                        striped=True,
-                        bordered=True,
-                        hover=True,
-                        responsive=True,
-                        className="table-sm"
-                    )
-                    
-                    # Create charts
-                    fig_size = px.bar(
-                        df,
-                        x='market_name',
-                        y='market_size',
-                        title='Market Size (Billions USD)',
-                        labels={'market_name': 'Market', 'market_size': 'Market Size (Billions USD)'}
-                    )
-                    
-                    fig_growth = px.bar(
-                        df,
-                        x='market_name',
-                        y='growth_rate',
-                        title='Annual Growth Rate (%)',
-                        labels={'market_name': 'Market', 'growth_rate': 'Growth Rate (%)'}
-                    )
-                    
-                    return table, fig_size, fig_growth
-                
-                return (
-                    dbc.Alert("Emerging markets strategy not available.", color="danger"),
-                    {},
-                    {}
-                )
-                
-            except Exception as e:
-                logger.error(f"Error updating emerging markets: {str(e)}")
-                return (
-                    dbc.Alert(f"Error loading emerging markets data: {str(e)}", color="danger"),
-                    {},
-                    {}
-                )
-                
-        @self.app.callback(
-            Output("market-details", "children"),
-            [Input("emerging-markets-table", "active_cell"),
-             Input("emerging-markets-table", "data")],
-            prevent_initial_call=True
-        )
-        def display_market_details(active_cell, data):
-            """Display details for the selected market."""
-            if not active_cell or not data:
-                return dbc.Alert("Select a market to view details.", color="info")
-                
-            try:
-                row = active_cell["row"]
-                market = data[row]
-                
-                # Create a card with market details
-                card = dbc.Card([
-                    dbc.CardHeader([
-                        html.H4(market["market_name"], className="mb-0")
-                    ]),
-                    dbc.CardBody([
-                        html.P(market["description"], className="card-text"),
-                        html.Hr(),
-                        html.H5("Key Metrics"),
-                        dbc.Row([
-                            dbc.Col([
-                                html.Div([
-                                    html.Small("Market Size", className="text-muted"),
-                                    html.H4(f"${market['market_size']}B")
-                                ], className="mb-3")
-                            ], width=4),
-                            dbc.Col([
-                                html.Div([
-                                    html.Small("Growth Rate", className="text-muted"),
-                                    html.H4(f"{market['growth_rate']}%")
-                                ], className="mb-3")
-                            ], width=4),
-                            dbc.Col([
-                                html.Div([
-                                    html.Small("Market Score", className="text-muted"),
-                                    html.H4(f"{market['market_score']:.1f}/100")
-                                ], className="mb-3")
-                            ], width=4)
-                        ]),
-                        html.H5("Key Drivers"),
-                        html.Ul([html.Li(driver) for driver in market["key_drivers"].split(", ")]),
-                        html.H5("Risks"),
-                        html.Ul([html.Li(risk) for risk in market["risks"].split(", ")]),
-                        html.Hr(),
-                        html.Div([
-                            html.Small("Last Updated: "),
-                            html.Small(datetime.fromisoformat(market["last_updated"]).strftime("%Y-%m-%d %H:%M"))
-                        ], className="text-muted")
-                    ]),
-                    dbc.CardFooter([
-                        dbc.Button("View Research", color="primary", href=market["source_urls"][0], target="_blank")
-                    ])
-                ])
-                
-                return card
-                
-            except Exception as e:
-                logger.error(f"Error displaying market details: {str(e)}")
-                return dbc.Alert(f"Error displaying market details: {str(e)}", color="danger")
-
+        # Import our callbacks
+        from ui.callbacks.emerging_markets_callbacks import register_callbacks
+        
+        # Register the callbacks with the app
+        register_callbacks(self.app)
     def _setup_agent_callbacks(self):
         """Sets up callbacks related to agent control and ticker analysis."""
         
@@ -1091,57 +1165,340 @@ class DashDashboard:
                 return dbc.Alert(error_message, color="danger", className="mt-2")
             except Exception as e:
                 return dbc.Alert(f"An unexpected error occurred: {e}", color="danger", className="mt-2")
+                
+        # Callback for fundamental analysis
+        @self.app.callback(
+            Output("fundamental-analysis-results", "children"),
+            [Input("fundamental-analyze-button", "n_clicks")],
+            [State("fundamental-ticker-input", "value"),
+             State("url", "pathname")],
+            prevent_initial_call=True
+        )
+        def analyze_fundamentals(n_clicks, ticker, pathname):
+            if not n_clicks or not ticker or pathname != "/agents":
+                raise dash.exceptions.PreventUpdate
+                
+            try:
+                # Call the API to get fundamental analysis
+                response = requests.get(f"{self.api_base_url}/fundamental-analysis/{ticker}")
+                response.raise_for_status()
+                analysis = response.json()
+                
+                # Create the layout for the analysis results
+                return self._create_fundamental_analysis_layout(analysis)
+                
+            except requests.exceptions.RequestException as e:
+                error_msg = f"Error fetching fundamental analysis: {e.response.text if e.response else str(e)}"
+                return dbc.Alert(error_msg, color="danger")
+            except Exception as e:
+                return dbc.Alert(f"An unexpected error occurred: {str(e)}", color="danger")
+
+    def _create_fundamental_analysis_layout(self, analysis):
+        """Creates the layout for displaying fundamental analysis results."""
+        # Extract data from analysis
+        ticker = analysis.get('ticker', 'N/A')
+        company_name = analysis.get('company_name', 'N/A')
+        current_price = analysis.get('current_price', 'N/A')
+        target_price = analysis.get('target_price', 'N/A')
+        recommendation = analysis.get('recommendation', 'N/A')
+        fundamentals = analysis.get('fundamentals', {})
+        valuation = analysis.get('valuation_metrics', {})
+        analysis_data = analysis.get('analysis', {})
+        
+        # Determine recommendation color
+        rec_color = "success" if recommendation == "BUY" else "warning" if recommendation == "HOLD" else "danger"
+        
+        # Create the layout
+        return html.Div([
+            # Header with ticker and recommendation
+            dbc.Row([
+                dbc.Col([
+                    html.H4(f"{company_name} ({ticker})", className="mb-0"),
+                    html.Small(f"Current Price: ${current_price}", className="text-muted")
+                ]),
+                dbc.Col([
+                    html.Div([
+                        html.Strong("Recommendation: "),
+                        dbc.Badge(recommendation, color=rec_color, className="ms-2")
+                    ], className="text-end")
+                ], width="auto")
+            ], className="mb-4"),
+            
+            # Tabs for different sections
+            dbc.Tabs([
+                # Fundamentals Tab
+                dbc.Tab(label="Fundamentals", children=[
+                    html.Div(className="mt-3"),
+                    dbc.Row([
+                        dbc.Col([
+                            dbc.Card([
+                                dbc.CardHeader("Key Metrics"),
+                                dbc.CardBody([
+                                    dbc.Row([
+                                        dbc.Col([
+                                            html.Div([
+                                                html.Div("P/E Ratio", className="text-muted small"),
+                                                html.H5(f"{fundamentals.get('pe_ratio', 'N/A')}", 
+                                                       className=("text-success" if fundamentals.get('pe_ratio', 0) < 20 else "text-danger"))
+                                            ], className="text-center p-2")
+                                        ], className="border-end"),
+                                        dbc.Col([
+                                            html.Div([
+                                                html.Div("PEG Ratio", className="text-muted small"),
+                                                html.H5(f"{fundamentals.get('peg_ratio', 'N/A')}",
+                                                       className=("text-success" if fundamentals.get('peg_ratio', 0) < 1.5 else "text-danger"))
+                                            ], className="text-center p-2")
+                                        ], className="border-end"),
+                                        dbc.Col([
+                                            html.Div([
+                                                html.Div("ROE", className="text-muted small"),
+                                                html.H5(f"{fundamentals.get('roe', 0)*100:.1f}%",
+                                                       className=("text-success" if fundamentals.get('roe', 0) > 0.15 else "text-danger"))
+                                            ], className="text-center p-2")
+                                        ], className="border-end"),
+                                        dbc.Col([
+                                            html.Div([
+                                                html.Div("Debt/Equity", className="text-muted small"),
+                                                html.H5(f"{fundamentals.get('debt_to_equity', 'N/A')}",
+                                                       className=("text-success" if fundamentals.get('debt_to_equity', 0) < 1.0 else "text-danger"))
+                                            ], className="text-center p-2")
+                                        ])
+                                    ], className="mb-3"),
+                                    
+                                    # Detailed metrics
+                                    dbc.Row([
+                                        dbc.Col([
+                                            dbc.ListGroup([
+                                                dbc.ListGroupItem([
+                                                    html.Div(["Sector"], className="text-muted small"),
+                                                    html.Div(fundamentals.get('sector', 'N/A'))
+                                                ]),
+                                                dbc.ListGroupItem([
+                                                    html.Div(["Market Cap"], className="text-muted small"),
+                                                    html.Div(fundamentals.get('market_cap', 'N/A'))
+                                                ]),
+                                                dbc.ListGroupItem([
+                                                    html.Div(["Current Ratio"], className="text-muted small"),
+                                                    html.Div(fundamentals.get('current_ratio', 'N/A'),
+                                                           className=("text-success" if fundamentals.get('current_ratio', 0) > 1.5 else "text-danger"))
+                                                ])
+                                            ], flush=True)
+                                        ], md=6),
+                                        dbc.Col([
+                                            dbc.ListGroup([
+                                                dbc.ListGroupItem([
+                                                    html.Div(["Dividend Yield"], className="text-muted small"),
+                                                    html.Div(f"{fundamentals.get('dividend_yield', 0)*100:.2f}%" if fundamentals.get('dividend_yield') is not None else 'N/A')
+                                                ]),
+                                                dbc.ListGroupItem([
+                                                    html.Div(["Revenue Growth"], className="text-muted small"),
+                                                    html.Div(f"{fundamentals.get('revenue_growth', 0)*100:.1f}%" if fundamentals.get('revenue_growth') is not None else 'N/A',
+                                                           className=("text-success" if fundamentals.get('revenue_growth', 0) > 0 else "text-danger"))
+                                                ]),
+                                                dbc.ListGroupItem([
+                                                    html.Div(["Earnings Growth"], className="text-muted small"),
+                                                    html.Div(f"{fundamentals.get('earnings_growth', 0)*100:.1f}%" if fundamentals.get('earnings_growth') is not None else 'N/A',
+                                                           className=("text-success" if fundamentals.get('earnings_growth', 0) > 0 else "text-danger"))
+                                                ])
+                                            ], flush=True)
+                                        ], md=6)
+                                    ])
+                                ])
+                            ])
+                        ])
+                    ])
+                ]),
+                
+                # Valuation Tab
+                dbc.Tab(label="Valuation", children=[
+                    html.Div(className="mt-3"),
+                    dbc.Row([
+                        dbc.Col([
+                            dbc.Card([
+                                dbc.CardHeader("Valuation Metrics"),
+                                dbc.CardBody([
+                                    dbc.Row([
+                                        dbc.Col([
+                                            dbc.ListGroup([
+                                                dbc.ListGroupItem([
+                                                    html.Div(["Current Price"], className="text-muted small"),
+                                                    html.Div(f"${current_price}", className="h5 mb-0")
+                                                ]),
+                                                dbc.ListGroupItem([
+                                                    html.Div(["Target Price"], className="text-muted small"),
+                                                    html.Div(f"${target_price}", 
+                                                           className=("h5 mb-0 text-success" if target_price > current_price else "h5 mb-0 text-danger"))
+                                                ]),
+                                                dbc.ListGroupItem([
+                                                    html.Div(["Upside/Downside"], className="text-muted small"),
+                                                    html.Div(
+                                                        f"{((target_price / current_price) - 1) * 100:.1f}%" if current_price and target_price else 'N/A',
+                                                        className=("text-success" if target_price > current_price else "text-danger")
+                                                    )
+                                                ])
+                                            ], flush=True)
+                                        ], md=6),
+                                        dbc.Col([
+                                            dbc.Card([
+                                                dbc.CardHeader("Valuation Methods"),
+                                                dbc.ListGroup(flush=True, children=[
+                                                    dbc.ListGroupItem([
+                                                        html.Div(["P/E Based"], className="text-muted small"),
+                                                        html.Div(f"${valuation.get('pe_valuation', 'N/A')}")
+                                                    ]),
+                                                    dbc.ListGroupItem([
+                                                        html.Div(["DCF"], className="text-muted small"),
+                                                        html.Div(f"${valuation.get('dcf_valuation', 'N/A')}")
+                                                    ]),
+                                                    dbc.ListGroupItem([
+                                                        html.Div(["Comparables"], className="text-muted small"),
+                                                        html.Div(f"${valuation.get('comparable_companies_valuation', 'N/A')}")
+                                                    ])
+                                                ])
+                                            ])
+                                        ], md=6)
+                                    ])
+                                ])
+                            ])
+                        ])
+                    ])
+                ]),
+                
+                # Analysis Tab
+                dbc.Tab(label="Analysis", children=[
+                    html.Div(className="mt-3"),
+                    dbc.Row([
+                        dbc.Col([
+                            dbc.Card([
+                                dbc.CardHeader("Strengths"),
+                                dbc.CardBody([
+                                    dbc.ListGroup(flush=True, children=[
+                                        dbc.ListGroupItem(html.Span(html.I(className="fas fa-check-circle text-success me-2") + item))
+                                        for item in analysis_data.get('strengths', ["No strengths identified."])
+                                    ])
+                                ])
+                            ], className="mb-3"),
+                            
+                            dbc.Card([
+                                dbc.CardHeader("Risks"),
+                                dbc.CardBody([
+                                    dbc.ListGroup(flush=True, children=[
+                                        dbc.ListGroupItem(html.Span(html.I(className="fas fa-exclamation-triangle text-warning me-2") + item))
+                                        for item in analysis_data.get('risks', ["No specific risks identified."])
+                                    ])
+                                ])
+                            ])
+                        ], md=6),
+                        
+                        dbc.Col([
+                            dbc.Card([
+                                dbc.CardHeader("Summary"),
+                                dbc.CardBody([
+                                    html.P(analysis_data.get('summary', 'No analysis summary available.'), 
+                                          className="text-justify"),
+                                    html.Hr(),
+                                    html.Div([
+                                        dbc.Button("View Full Report", color="primary", className="me-2"),
+                                        dbc.Button("Add to Watchlist", color="outline-primary")
+                                    ], className="d-flex justify-content-end mt-3")
+                                ])
+                            ])
+                        ], md=6)
+                    ])
+                ])
+            ])
+        ])
 
     def _setup_callbacks(self):
         """Set up general Dash callbacks for system control and UI updates."""
+        # Callback to toggle backtesting settings visibility
         @self.app.callback(
-            [Output("backtest-settings", "style")],
-            [Input("backtest-mode", "value")]
+            Output('backtest-settings', 'style'),
+            [Input('mode-selection', 'value')]
         )
-        def toggle_backtest_settings(mode):
-            if mode == "backtest":
-                return [{"display": "block"}]
-            return [{"display": "none"}]
+        def toggle_backtest_settings(selected_mode):
+            return {'display': 'block'} if selected_mode == 'backtest' else {'display': 'none'}
             
+        # Callback to handle system start/stop
         @self.app.callback(
-            [Output("start-button", "children"),
-             Output("start-button", "color")],
-            [Input("start-button", "n_clicks")],
-            [State("start-button", "children")]
+            [
+                Output('start-system-btn', 'disabled'),
+                Output('stop-system-btn', 'disabled'),
+                Output('system-status-text', 'children'),
+                Output('system-status-text', 'className'),
+                Output('system-logs-overview', 'value')
+            ],
+            [
+                Input('start-system-btn', 'n_clicks'),
+                Input('stop-system-btn', 'n_clicks')
+            ],
+            [
+                State('mode-selection', 'value'),
+                State('backtest-start-date', 'date'),
+                State('backtest-end-date', 'date'),
+                State('initial-capital', 'value'),
+                State('system-logs-overview', 'value')
+            ]
         )
-        def handle_start_button(n_clicks, current_label):
-            if n_clicks is None:
-                raise PreventUpdate
+        def toggle_system(start_clicks, stop_clicks, mode, start_date, end_date, capital, current_logs):
+            ctx = dash.callback_context
+            if not ctx.triggered:
+                raise dash.exceptions.PreventUpdate
                 
-            if current_label == "Start System":
-                # Start the system
-                return "Stop System", "danger"
-            else:
-                # Stop the system
-                return "Start System", "success"
-
+            button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+            
+            if button_id == 'start-system-btn':
+                # Start system logic
+                log_entry = f"{datetime.now().strftime('%H:%M:%S')} - System started in {mode} mode.\n"
+                return True, False, "Running", "badge bg-success ms-2", log_entry + (current_logs or '')
+                
+            elif button_id == 'stop-system-btn':
+                # Stop system logic
+                log_entry = f"{datetime.now().strftime('%H:%M:%S')} - System stopped.\n"
+                return False, True, "Stopped", "badge bg-secondary ms-2", log_entry + (current_logs or '')
+                
+            return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+            
+        # Callback to update system metrics periodically
         @self.app.callback(
-            Output("system-status", "children"),
-            [Input("start-button", "n_clicks")],
-            prevent_initial_call=True
+            [
+                Output('active-agents-metric', 'children'),
+                Output('trades-today-metric', 'children'),
+                Output('current-pnl-metric', 'children'),
+                Output('system-uptime', 'children')
+            ],
+            [Input('interval-component', 'n_intervals')],
+            [State('system-status-text', 'children')]
         )
-        def handle_start_system(n_clicks):
-            if n_clicks is None:
-                raise PreventUpdate
+        def update_metrics(n, status):
+            if status != "Running":
+                raise dash.exceptions.PreventUpdate
                 
             try:
-                # Toggle system status
-                response = requests.post(f"{self.api_base_url}/system/toggle")
-                response.raise_for_status()
-                data = response.json()
-                return f"System is now {data.get('status', 'unknown')}"
-            except requests.exceptions.RequestException as e:
-                error_detail = e.response.text if e.response else str(e)
-                logger.error(f"API Error toggling system: {error_detail}")
-                return f"Error: {error_detail}"
+                # Simulate updating metrics (replace with actual API calls)
+                active_agents = len(self.agent_manager.agents) if hasattr(self, 'agent_manager') and self.agent_manager else 0
+                trades_today = 0  # Replace with actual trade count
+                pnl = "$0.00"  # Replace with actual P&L calculation
+                
+                # Calculate uptime (simplified)
+                uptime_seconds = n % (24 * 60 * 60)  # Reset daily for demo
+                hours, remainder = divmod(uptime_seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                uptime_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                
+                return active_agents, trades_today, pnl, uptime_str
+                
             except Exception as e:
-                logger.error(f"Error starting system: {e}")
-                return f"Error: {str(e)}"
+                logger.error(f"Error updating metrics: {e}")
+                raise dash.exceptions.PreventUpdate
+            
+        # Callback to handle mode selection changes
+        @self.app.callback(
+            Output('mode-selection', 'disabled'),
+            [Input('system-status-text', 'children')]
+        )
+        def disable_mode_dropdown(status):
+            return status == "Running"
 
         @self.app.callback(
             Output("existing-models-list", "children"),
@@ -1179,7 +1536,8 @@ class DashDashboard:
                 response.raise_for_status()
                 data = response.json()
 
-                status_msg = dbc.Alert(data.get("message", "Training initiated successfully."), color="success", className="mt-2")
+                status_msg = dbc.Alert(data.get("message", "Training initiated successfully."), 
+                                    color="success", className="mt-2")
                 
                 history_graph = html.Div()
                 if 'history' in data and data['history']:
@@ -1189,7 +1547,13 @@ class DashDashboard:
                         if col.lower() != 'epoch':
                             fig.add_trace(go.Scatter(y=history_df[col], name=col, mode='lines+markers'))
                 
-                    fig.update_layout(title="Training History", xaxis_title="Epoch", yaxis_title="Metric Value", margin=dict(t=30, b=10, l=10, r=10), height=300)
+                    fig.update_layout(
+                        title="Training History", 
+                        xaxis_title="Epoch", 
+                        yaxis_title="Metric Value", 
+                        margin=dict(t=30, b=10, l=10, r=10), 
+                        height=300
+                    )
                     history_graph = dcc.Graph(figure=fig)
             
                 metrics_display = html.Div([
@@ -1198,11 +1562,19 @@ class DashDashboard:
                 ])
             
                 return status_msg, history_graph, metrics_display
+                
             except requests.exceptions.RequestException as e:
                 error_detail = e.response.text if e.response else str(e)
-                return dbc.Alert(f"API Error during model training: {error_detail}", color="danger"), dash.no_update, dash.no_update
+                return dbc.Alert(
+                    f"API Error during model training: {error_detail}", 
+                    color="danger"
+                ), dash.no_update, dash.no_update
+                
             except Exception as e:
-                return dbc.Alert(f"An unexpected error occurred: {e}", color="danger"), dash.no_update, dash.no_update
+                return dbc.Alert(
+                    f"An unexpected error occurred: {e}", 
+                    color="danger"
+                ), dash.no_update, dash.no_update
 
     def list_existing_models(self, pathname):
         if pathname == "/models":
@@ -1245,12 +1617,16 @@ api:
             f.write(dummy_config_content)
         print(f"Created dummy {config_path} for testing.")
 
-    config_manager = ConfigManager(config_path)
-    app_config = config_manager.get_config()
+    app_config = ConfigManager.load_config(config_path)
 
     dashboard = DashDashboard(config=app_config)
+    # Get the port from the config
+    port = app_config.get('ui', {}).get('dashboard_port', 8088)
+    print(f"Starting dashboard on port {port}...")
+    
     # To run directly for testing (without Gunicorn/Waitress):
     try:
-        dashboard.app.run_server(debug=True, port=app_config.get('ui', {}).get('dashboard_port', 8080), host='0.0.0.0')
+        dashboard.app.run_server(debug=True, port=port, host='0.0.0.0')
     except Exception as e:
         print(f"Error running dashboard: {e}")
+        raise

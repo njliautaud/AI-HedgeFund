@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 AI Hedge Fund - Development Server
 
@@ -11,9 +12,17 @@ import time
 import subprocess
 import signal
 import webbrowser
+import io
+import sys
 from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+
+# Fix Windows console encoding for emoji
+if sys.platform == 'win32':
+    import codecs
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, 'utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, 'utf-8')
 
 # Project root directory
 PROJECT_ROOT = Path(__file__).parent.absolute()

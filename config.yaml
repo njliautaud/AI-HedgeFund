@@ -42,10 +42,10 @@ api_keys:
   # Using free data sources only
   yfinance: "free"
   # Other paid APIs are disabled
-  alpha_vantage: ""
-  finnhub: ""
-  fred: ""
-  quandl: ""
+  alpha_vantage: "REDACTED_ALPHA_VANTAGE_API_KEY"
+  finnhub: "REDACTED_FINNHUB_API_KEY"
+  fred: "REDACTED_FRED_API_KEY "
+  quandl: "REDACTED_QUANDL_API_KEY"
 
 # Cache configuration
 cache:
@@ -93,6 +93,19 @@ ai_models:
 
 # Investment Strategies
 investment_strategies:
+  # Fundamental Analysis Agent
+  fundamental_analysis:
+    name: "Fundamental Analysis Agent"
+    description: "Rule-based agent that values companies using standard fundamental metrics like P/E, P/S, and DCF"
+    model_type: "rule_based"
+    enabled: true
+    parameters:
+      max_pe_ratio: 30.0
+      max_peg_ratio: 2.0
+      min_current_ratio: 1.5
+      max_debt_to_equity: 1.0
+      margin_of_safety: 0.2
+      
   # Legendary Investor AI Models
   legendary_investors:
     warren_buffett:
@@ -303,8 +316,8 @@ investment_strategies:
 
 # UI Configuration
 ui:
-  dashboard_port: 8088  # Unique port for dashboard
-  api_port: 8089       # Unique port for API server
+  dashboard_port: 8089  # Unique port for dashboard
+  api_port: 8090       # Unique port for API server
 
 # Economic Indicators
 economic_indicators:
