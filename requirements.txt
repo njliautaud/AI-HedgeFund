@@ -1,61 +1,33 @@
-# AI Hedge Fund Infrastructure Requirements
+# AI Hedge Fund - Core Dependencies
 
-# Core ML/AI Frameworks
-torch>=2.0.0
-transformers>=4.30.0
-scikit-learn>=1.3.0
-numpy>=1.24.0
+# Core Data Analysis
 pandas>=2.0.0
+numpy>=1.24.0
 
-# Financial Data APIs
+# Financial Data
 yfinance>=0.2.18
-fredapi>=0.4.3
-quandl>=3.7.0
-alpha-vantage>=2.3.1
-finnhub-python>=2.4.18
 
-# Web Framework & UI
-flask>=2.3.0
-dash>=2.11.0
-dash-bootstrap-components>=1.4.0
-dash-core-components>=2.0.0
-dash-html-components>=2.0.0
-dash-table>=5.0.0
-plotly>=5.15.0
-dash-iconify>=0.1.0
+# LLM Integration
+google-generativeai>=0.3.0
 
-# Data Processing & Analysis
-scipy>=1.11.0
-statsmodels>=0.14.0
-nltk>=3.8.1
-textblob>=0.17.1
-vaderSentiment>=3.3.2
-
-# Database & Storage
-sqlalchemy>=2.0.0
-redis>=4.6.0
-
-# API & Web
-flask-cors>=4.0.0
-flask-restful>=0.3.9
+# Environment Management
 python-dotenv>=1.0.0
 
-# Utilities
+# HTTP Requests
 requests>=2.31.0
-beautifulsoup4>=4.12.0
-selenium>=4.10.0
-schedule>=1.2.0
-loguru>=0.7.0
-click>=8.1.0
+
+# Date/Time
 python-dateutil>=2.8.2
 pytz>=2023.3
+
+# Logging
+loguru>=0.7.0
 
 # Development & Testing
 pytest>=7.4.0
 black>=23.7.0
 flake8>=6.0.0
 pytest-cov>=4.1.0
-pytest-mock>=3.11.1
 
 # Documentation
 sphinx>=7.0.0

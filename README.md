@@ -1,24 +1,24 @@
 # AI Hedge Fund
 
-A comprehensive AI-driven hedge fund infrastructure featuring multiple legendary investor AI strategies, economic analysis bots, real-time market analysis, portfolio management, and local AI model training.
+A streamlined, rule-based AI investment system featuring specialized analysis agents and an LLM-based decision maker. This system uses a combination of fundamental, technical, sentiment, and market analysis to make informed investment decisions.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.9+
 - pip (Python package manager)
-- Git
+- Gemini API key (for LLM functionality)
 
 ### Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/AI-HedgeFund.git
+   git clone https://github.com/njliautaud/AI-HedgeFund.git
    cd AI-HedgeFund
    ```
 
-2. Create and activate a virtual environment (recommended):
+2. Create and activate a virtual environment:
    ```bash
    # On Windows
    python -m venv venv
@@ -34,21 +34,96 @@ A comprehensive AI-driven hedge fund infrastructure featuring multiple legendary
    pip install -r requirements.txt
    ```
 
-4. Set up environment variables:
-   - Copy `.env.example` to `.env` and update with your API keys
-   - For development, you can use the default configuration which uses free data sources
-
-### Running the Dashboard
-
-#### Production Mode
-
-1. Start the dashboard:
+4. Set up your Gemini API key:
    ```bash
-   python run_dashboard.py
+   # On Windows
+   setx GEMINI_API_KEY "your-api-key-here"
+   
+   # On macOS/Linux
+   export GEMINI_API_KEY="your-api-key-here"
+   ```
+   
+   Or create a `.env` file in the project root:
+   ```
+   GEMINI_API_KEY=your-api-key-here
    ```
 
-2. Open your web browser and navigate to:
-   ```
+### Running the Example
+
+To analyze a set of stocks and get investment recommendations:
+
+```bash
+python example.py
+```
+
+This will analyze several major stocks and provide detailed investment recommendations based on the combined analysis of multiple specialized agents.
+
+### Architecture
+
+The system consists of several specialized agents that analyze different aspects of a stock:
+
+1. **Fundamental Agent**: Analyzes company financials, valuation metrics, and growth potential.
+2. **Technical Agent**: Examines price patterns, trends, and technical indicators.
+3. **Sentiment Agent**: Assesses market sentiment from news and social media.
+4. **Market Agent**: Analyzes overall market conditions and sector performance.
+5. **LLM Manager**: Synthesizes information from all agents to make final investment decisions.
+
+### Configuration
+
+You can customize the behavior of the agents by modifying the `config.yaml` file. Key settings include:
+
+- Investment rules and scoring weights
+- Technical indicator parameters
+- Market analysis preferences
+- API rate limiting and caching settings
+
+## Example Output
+
+```
+Analyzing AAPL...
+
+================================================================================
+Analysis for AAPL - Apple Inc.
+Sector: Technology
+Current Price: $175.34
+
+Fundamental Analysis:
+- Score: 82.5/100
+- Summary: Apple Inc. shows strong fundamentals with a score of 82.5/100...
+
+Technical Analysis:
+- Score: 68.3/100
+- Summary: Mixed technical signals with a neutral to slightly bullish bias...
+
+Sentiment Analysis:
+- Score: 72.1/100
+- Summary: Sentiment analysis shows positive sentiment based on 15 recent articles...
+
+Market Context:
+- Market conditions are favorable with major indices trending upward.
+- Technology sector is outperforming the broader market.
+
+Investment Decision:
+[LLM-generated investment recommendation with reasoning]
+================================================================================
+```
+
+## Requirements
+
+- Python 3.9+
+- yfinance
+- pandas
+- numpy
+- google-generativeai
+- python-dotenv
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Disclaimer
+
+This software is for educational and informational purposes only. It is not intended as financial advice, and you should not rely on it as such. Always do your own research and consider your financial situation before making investment decisions.
    http://localhost:8088
    ```
 
@@ -158,11 +233,17 @@ It integrates with multiple data sources including Alpha Vantage, FRED, Finnhub,
 The Strategy Manager orchestrates multiple AI-driven investment strategies, including models based on legendary investors:
 
 - Warren Buffett (Value Investing)
-- Peter Lynch (Growth at Reasonable Price)
-- Benjamin Graham (Deep Value)
-- Ray Dalio (All Weather)
-- George Soros (Reflexivity)
-- Joel Greenblatt (Magic Formula)
+## Key Features
+
+- **Rule-based Analysis**: Transparent, explainable decision-making process
+- **Modular Design**: Easy to add or modify analysis components
+- **Multi-timeframe Analysis**: Combines short, medium, and long-term perspectives
+- **Risk Management**: Built-in position sizing and stop-loss mechanisms
+- **Customizable**: Adjust parameters and rules to match your investment style
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 - Economic and macro strategies
 
 Each strategy generates signals that are aggregated to provide unified portfolio recommendations.
