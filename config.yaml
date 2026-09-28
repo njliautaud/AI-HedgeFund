@@ -41,11 +41,11 @@ database:
 api_keys:
   # Using free data sources only
   yfinance: "free"
-  # Other paid APIs are disabled
-  alpha_vantage: "REDACTED_ALPHA_VANTAGE_API_KEY"
-  finnhub: "REDACTED_FINNHUB_API_KEY"
-  fred: "REDACTED_FRED_API_KEY "
-  quandl: "REDACTED_QUANDL_API_KEY"
+  # Paid APIs: values are read from environment variables (see .env.example)
+  alpha_vantage: "${ALPHA_VANTAGE_API_KEY}"
+  finnhub: "${FINNHUB_API_KEY}"
+  fred: "${FRED_API_KEY}"
+  quandl: "${QUANDL_API_KEY}"
 
 # Cache configuration
 cache:
